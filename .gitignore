@@ -1,0 +1,31 @@
+# Node Modules
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment Variables (CRITICAL)
+.env
+backend/.env
+frontend/.env
+
+# Expo / React Native builds
+.expo/
+frontend/.expo/
+frontend/web-build/
+
+# IDE and Editor folders
+.idea/
+.vscode/
+
+# Backend Uploads (Don't push locally uploaded test images)
+backend/uploads/
+
+# Local backups and documentation drafts
+Reference/
+DataBase.md
+PROGRESS.md
+
+# Ignore all markdown files in root just in case...
+*.md
+# ...but explicitly KEEP the README file
+!README.md
