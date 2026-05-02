@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  Modal,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -13,7 +15,7 @@ import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import InputField from '../../components/InputField';
 import Loading from '../../components/Loading';
-import colors from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 
 const statusFilters = ['All', 'Pending', 'Confirmed', 'Rejected', 'Refunded'];
 
@@ -53,7 +55,7 @@ const formatTime = (value) => {
 
 const getPaymentTimestamp = (payment) => payment.paymentDate || payment.createdAt;
 
-const DetailRow = ({ label, value }) => (
+const DetailRow = ({ styles, label, value }) => (
   <View style={styles.detailRow}>
     <Text style={styles.detailLabel}>{label}</Text>
     <Text style={styles.detailValue}>{value || 'N/A'}</Text>
@@ -61,12 +63,19 @@ const DetailRow = ({ label, value }) => (
 );
 
 const ManagePaymentsScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [payments, setPayments] = useState([]);
   const [statusFilter, setStatusFilter] = useState('All');
   const [search, setSearch] = useState('');
+  const [rejectingPayment, setRejectingPayment] = useState(null);
+  const [rejectionNote, setRejectionNote] = useState('');
+  const [rejectionError, setRejectionError] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const fetchPayments = useCallback(async (showRefresh = false) => {
     if (showRefresh) {
@@ -76,6 +85,7 @@ const ManagePaymentsScreen = () => {
     }
 
     setError('');
+    setSuccessMessage('');
 
     try {
       const params = statusFilter === 'All' ? {} : { status: statusFilter };
@@ -115,11 +125,75 @@ const ManagePaymentsScreen = () => {
   }, [payments, search]);
 
   const handleConfirm = async (paymentId) => {
+    setSuccessMessage('');
+
     try {
       await client.patch(`/payments/${paymentId}/confirm`);
       await fetchPayments(true);
+      setSuccessMessage('Payment confirmed successfully.');
     } catch (confirmError) {
       Alert.alert('Confirm Failed', getErrorMessage(confirmError));
+    }
+  };
+
+  const openRejectModal = (payment) => {
+    setRejectingPayment(payment);
+    setRejectionNote(payment.rejectedReason || '');
+    setRejectionError('');
+    setSuccessMessage('');
+  };
+
+  const closeRejectModal = (force = false) => {
+    if (isRejecting && !force) {
+      return;
+    }
+
+    setRejectingPayment(null);
+    setRejectionNote('');
+    setRejectionError('');
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectingPayment?._id) {
+      return;
+    }
+
+    const note = rejectionNote.trim();
+
+    if (!note) {
+      setRejectionError('Rejection note is required.');
+      return;
+    }
+
+    setIsRejecting(true);
+    setRejectionError('');
+    setError('');
+
+    try {
+      const response = await client.patch(`/payments/${rejectingPayment._id}/reject`, {
+        rejectedReason: note,
+        rejectionNote: note,
+      });
+      const updatedPayment = response.data.payment || {
+        ...rejectingPayment,
+        status: 'Rejected',
+        rejectedReason: note,
+      };
+
+      setPayments((currentPayments) =>
+        currentPayments.map((payment) =>
+          payment._id === rejectingPayment._id
+            ? { ...payment, ...updatedPayment, status: 'Rejected', rejectedReason: note }
+            : payment
+        )
+      );
+      setSuccessMessage('Payment rejected successfully.');
+      closeRejectModal(true);
+    } catch (rejectError) {
+      const message = getErrorMessage(rejectError);
+      setRejectionError(message);
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -180,6 +254,7 @@ const ManagePaymentsScreen = () => {
   const renderPayment = ({ item }) => {
     const paymentTimestamp = getPaymentTimestamp(item);
     const canConfirm = item.status === 'Pending';
+    const canReject = item.status === 'Pending';
     const canRemove = item.status !== 'Confirmed';
 
     return (
@@ -202,10 +277,16 @@ const ManagePaymentsScreen = () => {
         </View>
 
         <View style={styles.detailsPanel}>
-          <DetailRow label="Appointment ID" value={item.appointment?.appointmentCode} />
-          <DetailRow label="Payment Date" value={formatDate(paymentTimestamp)} />
-          <DetailRow label="Payment Time" value={formatTime(paymentTimestamp)} />
-          <DetailRow label="Payment Method" value={item.paymentMethod} />
+          <DetailRow styles={styles} label="Appointment ID" value={item.appointment?.appointmentCode} />
+          <DetailRow styles={styles} label="Payment Date" value={formatDate(paymentTimestamp)} />
+          <DetailRow styles={styles} label="Payment Time" value={formatTime(paymentTimestamp)} />
+          <DetailRow styles={styles} label="Payment Method" value={item.paymentMethod} />
+          {item.rejectedReason ? (
+            <View style={styles.rejectionNote}>
+              <Text style={styles.rejectionLabel}>Rejection Note</Text>
+              <Text style={styles.rejectionText}>{item.rejectedReason}</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.actionRow}>
@@ -214,6 +295,15 @@ const ManagePaymentsScreen = () => {
               title="Confirm"
               onPress={() => handleConfirm(item._id)}
               style={styles.actionButton}
+            />
+          ) : null}
+          {canReject ? (
+            <CustomButton
+              title="Reject"
+              type="secondary"
+              onPress={() => openRejectModal(item)}
+              style={[styles.actionButton, styles.rejectButton]}
+              textStyle={styles.rejectButtonText}
             />
           ) : null}
           {canRemove ? (
@@ -245,6 +335,7 @@ const ManagePaymentsScreen = () => {
         value={search}
         onChangeText={setSearch}
       />
+      <ErrorMessage message={successMessage} type="success" />
       <ErrorMessage message={error} />
 
       <FlatList
@@ -253,15 +344,65 @@ const ManagePaymentsScreen = () => {
         renderItem={renderPayment}
         contentContainerStyle={filteredPayments.length ? styles.list : styles.emptyList}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchPayments(true)} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => fetchPayments(true)}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surfaceElevated}
+          />
         }
         ListEmptyComponent={<Text style={styles.emptyText}>No payments found.</Text>}
       />
+
+      <Modal
+        visible={Boolean(rejectingPayment)}
+        transparent
+        animationType="fade"
+        onRequestClose={closeRejectModal}
+      >
+        <View style={styles.modalBackdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeRejectModal} />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Reject Payment</Text>
+            <Text style={styles.modalSubtitle}>
+              Add a clear note for {rejectingPayment?.paymentCode || 'this payment'} before rejecting it.
+            </Text>
+            <InputField
+              placeholder="Rejection note"
+              value={rejectionNote}
+              onChangeText={(value) => {
+                setRejectionNote(value);
+                setRejectionError('');
+              }}
+              error={rejectionError}
+              multiline
+              textAlignVertical="top"
+              inputStyle={styles.noteInput}
+            />
+            <View style={styles.modalActions}>
+              <CustomButton
+                title="Close"
+                type="secondary"
+                onPress={closeRejectModal}
+                disabled={isRejecting}
+                style={styles.modalButton}
+              />
+              <CustomButton
+                title="Reject"
+                onPress={handleRejectSubmit}
+                loading={isRejecting}
+                style={styles.modalButton}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -280,9 +421,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   filterButton: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 9,
@@ -307,12 +448,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -375,6 +521,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'right',
   },
+  rejectionNote: {
+    backgroundColor: colors.errorBackground,
+    borderColor: colors.error,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 4,
+    padding: 12,
+  },
+  rejectionLabel: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  rejectionText: {
+    color: colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+  },
   statusBadge: {
     alignSelf: 'flex-start',
     borderRadius: 999,
@@ -389,16 +555,16 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
   pending: {
-    backgroundColor: '#FEF3C7',
-    color: '#B45309',
+    backgroundColor: colors.warningBackground,
+    color: colors.warning,
   },
   rejected: {
     backgroundColor: colors.errorBackground,
     color: colors.error,
   },
   refunded: {
-    backgroundColor: '#DBEAFE',
-    color: colors.primary,
+    backgroundColor: colors.infoBackground,
+    color: colors.info,
   },
   actionRow: {
     flexDirection: 'row',
@@ -408,7 +574,13 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    minWidth: 120,
+    minWidth: 100,
+  },
+  rejectButton: {
+    borderColor: colors.warning,
+  },
+  rejectButtonText: {
+    color: colors.warning,
   },
   destructiveButton: {
     borderColor: colors.error,
@@ -427,6 +599,49 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 16,
     textAlign: 'center',
+  },
+  modalBackdrop: {
+    alignItems: 'center',
+    backgroundColor: colors.overlay,
+    flex: 1,
+    justifyContent: 'center',
+    padding: 18,
+  },
+  modalCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.borderStrong,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.24,
+    shadowRadius: 28,
+    width: '100%',
+    elevation: 5,
+  },
+  modalTitle: {
+    color: colors.text,
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  modalSubtitle: {
+    color: colors.textMuted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 14,
+    marginTop: 6,
+  },
+  noteInput: {
+    minHeight: 110,
+    paddingTop: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
   },
 });
 

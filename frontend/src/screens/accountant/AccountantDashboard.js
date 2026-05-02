@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -11,35 +11,41 @@ import AnnouncementCarousel from '../../components/AnnouncementCarousel';
 import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import { useAuth } from '../../context/AuthContext';
-import colors from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 
 const getErrorMessage = (error) =>
   error?.response?.data?.message || error?.message || 'Unable to load accountant dashboard.';
 
-const StatCard = ({ label, value, helper, accentColor }) => (
-  <View style={styles.statCard}>
-    <View style={[styles.statAccent, { backgroundColor: accentColor }]} />
-    <View style={styles.statBody}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statHelper}>{helper}</Text>
+const formatCurrency = (value) =>
+  `Rs. ${Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+
+const getNestedTotal = (source) => Number(source?.total || 0);
+
+const MetricCard = ({ styles, label, value, helper, accentColor, toneStyle }) => (
+  <View style={styles.metricCard}>
+    <View style={styles.metricHeader}>
+      <View style={[styles.metricIcon, { backgroundColor: accentColor }]} />
+      <Text style={styles.metricLabel}>{label}</Text>
     </View>
+    <Text style={[styles.metricValue, toneStyle]}>{value}</Text>
+    <Text style={styles.metricHelper}>{helper}</Text>
   </View>
 );
 
 const AccountantDashboard = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { user, logout } = useAuth();
   const displayName = user?.username || user?.email || 'Accountant';
-  const [stats, setStats] = useState({
-    totalPayments: 0,
-    confirmed: 0,
-    pending: 0,
-  });
+  const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
 
-  const fetchStats = useCallback(async (showRefresh = false) => {
+  const fetchReport = useCallback(async (showRefresh = false) => {
     if (showRefresh) {
       setIsRefreshing(true);
     } else {
@@ -49,12 +55,8 @@ const AccountantDashboard = ({ navigation }) => {
     setError('');
 
     try {
-      const response = await client.get('/accountant/dashboard-stats');
-      setStats({
-        totalPayments: response.data.stats?.totalPayments || 0,
-        confirmed: response.data.stats?.confirmed || 0,
-        pending: response.data.stats?.pending || 0,
-      });
+      const response = await client.get('/accountant/financial-report');
+      setReport(response.data.report || null);
     } catch (fetchError) {
       setError(getErrorMessage(fetchError));
     } finally {
@@ -64,9 +66,27 @@ const AccountantDashboard = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    fetchReport();
+  }, [fetchReport]);
 
+  const financials = useMemo(() => {
+    const consultationRevenue = getNestedTotal(report?.revenue?.consultationRevenue);
+    const pharmacyIncome = getNestedTotal(report?.revenue?.pharmacyIncome);
+    const unpaidLiabilities = getNestedTotal(report?.liabilities?.unpaidSalaries);
+    const paidPayouts = getNestedTotal(report?.payouts?.paidSalaries);
+    const estimatedNetPosition = Number(report?.estimatedNetPosition || 0);
+
+    return {
+      consultationRevenue,
+      pharmacyIncome,
+      unpaidLiabilities,
+      paidPayouts,
+      estimatedNetPosition,
+    };
+  }, [report]);
+
+  const netToneStyle =
+    financials.estimatedNetPosition < 0 ? styles.negativeValue : styles.positiveValue;
   const loadingValue = isLoading ? '...' : null;
 
   return (
@@ -74,7 +94,13 @@ const AccountantDashboard = ({ navigation }) => {
       style={styles.screen}
       contentContainerStyle={styles.container}
       refreshControl={
-        <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchStats(true)} />
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={() => fetchReport(true)}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+          progressBackgroundColor={colors.surfaceElevated}
+        />
       }
     >
       <AnnouncementCarousel />
@@ -82,35 +108,60 @@ const AccountantDashboard = ({ navigation }) => {
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Accountant Portal</Text>
         <Text style={styles.title}>Welcome back, {displayName}</Text>
-        <Text style={styles.subtitle}>Track patient payments and verify pending transactions.</Text>
+        <Text style={styles.subtitle}>
+          Review revenue, liabilities, payouts, and cash position from one finance cockpit.
+        </Text>
       </View>
 
       <ErrorMessage message={error} />
 
-      <View style={styles.statsGrid}>
-        <StatCard
-          label="Total Payments"
-          value={loadingValue || stats.totalPayments}
-          helper="All recorded payment entries"
+      <View style={styles.heroPanel}>
+        <Text style={styles.heroLabel}>Estimated Net Position</Text>
+        <Text style={[styles.heroValue, netToneStyle]}>
+          {loadingValue || formatCurrency(financials.estimatedNetPosition)}
+        </Text>
+        <Text style={styles.heroMeta}>
+          {report?.period ? `Period: ${report.period}` : 'All-time financial summary'}
+        </Text>
+      </View>
+
+      <View style={styles.metricsGrid}>
+        <MetricCard
+          styles={styles}
+          label="Consultation Revenue"
+          value={loadingValue || formatCurrency(financials.consultationRevenue)}
+          helper="Confirmed appointment payments"
           accentColor={colors.primary}
         />
-        <StatCard
-          label="Confirmed"
-          value={loadingValue || stats.confirmed}
-          helper="Payments verified by finance"
-          accentColor={colors.success}
+        <MetricCard
+          styles={styles}
+          label="Pharmacy Income"
+          value={loadingValue || formatCurrency(financials.pharmacyIncome)}
+          helper="Paid pharmacy prescription fees"
+          accentColor={colors.secondary}
         />
-        <StatCard
-          label="Pending"
-          value={loadingValue || stats.pending}
-          helper="Payments awaiting review"
-          accentColor="#F59E0B"
+        <MetricCard
+          styles={styles}
+          label="Unpaid Liabilities"
+          value={loadingValue || formatCurrency(financials.unpaidLiabilities)}
+          helper="Pending salary obligations"
+          accentColor={colors.warning}
+          toneStyle={styles.warningValue}
+        />
+        <MetricCard
+          styles={styles}
+          label="Paid Payouts"
+          value={loadingValue || formatCurrency(financials.paidPayouts)}
+          helper="Settled salary records"
+          accentColor={colors.success}
         />
       </View>
 
       <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Quick Actions</Text>
-        <Text style={styles.panelText}>Open the payment register or update your profile details.</Text>
+        <Text style={styles.panelTitle}>Finance Actions</Text>
+        <Text style={styles.panelText}>
+          Verify pending payments, adjust salary settings, and keep audit records current.
+        </Text>
 
         <CustomButton
           title="Manage Payments"
@@ -140,7 +191,7 @@ const AccountantDashboard = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
@@ -172,44 +223,96 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 8,
   },
-  statsGrid: {
-    gap: 12,
-  },
-  statCard: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 8,
+  heroPanel: {
+    backgroundColor: colors.surfaceGlass,
+    borderColor: colors.borderStrong,
+    borderRadius: 18,
     borderWidth: 1,
-    flexDirection: 'row',
-    overflow: 'hidden',
+    marginBottom: 12,
+    padding: 18,
+    shadowColor: colors.shadowSoft,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    elevation: 3,
   },
-  statAccent: {
-    width: 6,
-  },
-  statBody: {
-    flex: 1,
-    padding: 16,
-  },
-  statLabel: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  statValue: {
-    color: colors.text,
-    fontSize: 30,
-    fontWeight: '800',
-    marginTop: 6,
-  },
-  statHelper: {
+  heroLabel: {
     color: colors.textMuted,
     fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  heroValue: {
+    color: colors.text,
+    fontSize: 32,
+    fontWeight: '900',
+    lineHeight: 40,
+    marginTop: 8,
+  },
+  heroMeta: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 6,
+  },
+  metricsGrid: {
+    gap: 12,
+  },
+  metricCard: {
+    backgroundColor: colors.surfaceGlass,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 15,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 2,
+  },
+  metricHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  metricIcon: {
+    borderRadius: 999,
+    height: 10,
+    width: 10,
+  },
+  metricLabel: {
+    color: colors.textMuted,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  metricValue: {
+    color: colors.text,
+    fontSize: 24,
+    fontWeight: '900',
+    lineHeight: 31,
+    marginTop: 10,
+  },
+  metricHelper: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 4,
   },
+  positiveValue: {
+    color: colors.success,
+  },
+  negativeValue: {
+    color: colors.error,
+  },
+  warningValue: {
+    color: colors.warning,
+  },
   panel: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     marginTop: 16,
     padding: 16,

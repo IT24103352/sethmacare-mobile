@@ -12,7 +12,7 @@ import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import InputField from '../../components/InputField';
 import Loading from '../../components/Loading';
-import colors from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 
 const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -32,7 +32,19 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
-const DetailRow = ({ label, value }) => (
+const formatPercentage = (value) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return 'N/A';
+  }
+
+  return `${numericValue.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+  })}%`;
+};
+
+const DetailRow = ({ styles, label, value }) => (
   <View style={styles.detailRow}>
     <Text style={styles.detailLabel}>{label}</Text>
     <Text style={styles.detailValue}>{value || 'N/A'}</Text>
@@ -40,17 +52,40 @@ const DetailRow = ({ label, value }) => (
 );
 
 const ManageSalariesScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [month, setMonth] = useState(getCurrentMonth());
+  const [organizationCutPercentage, setOrganizationCutPercentage] = useState('30');
   const [salaries, setSalaries] = useState([]);
   const [summary, setSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [payingId, setPayingId] = useState('');
   const [error, setError] = useState('');
+  const [settingsError, setSettingsError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
   const isValidMonth = monthPattern.test(month.trim());
+  const organizationCutValue = Number(organizationCutPercentage);
+  const isValidOrganizationCut =
+    Number.isFinite(organizationCutValue) && organizationCutValue >= 0 && organizationCutValue <= 100;
+
+  const fetchFinanceSettings = useCallback(async () => {
+    try {
+      const response = await client.get('/accountant/financial-report');
+      const currentCut = response.data.report?.settings?.organizationCutPercentage;
+
+      if (Number.isFinite(Number(currentCut))) {
+        setOrganizationCutPercentage(String(currentCut));
+      }
+
+      setSettingsError('');
+    } catch (settingsFetchError) {
+      setSettingsError(getErrorMessage(settingsFetchError));
+    }
+  }, []);
 
   const fetchSalaries = useCallback(async (showRefresh = false) => {
     if (!monthPattern.test(month.trim())) {
@@ -85,6 +120,10 @@ const ManageSalariesScreen = () => {
     fetchSalaries();
   }, [fetchSalaries]);
 
+  useEffect(() => {
+    fetchFinanceSettings();
+  }, [fetchFinanceSettings]);
+
   const totals = useMemo(() => {
     const totalAmount = salaries.reduce((total, salary) => total + (Number(salary.amount) || 0), 0);
     const pendingCount = salaries.filter((salary) => salary.status === 'Pending').length;
@@ -96,6 +135,42 @@ const ManageSalariesScreen = () => {
       paidCount,
     };
   }, [salaries]);
+
+  const handleSaveSettings = async () => {
+    if (!isValidOrganizationCut) {
+      setSettingsError('Organization cut must be a number from 0 to 100.');
+      return;
+    }
+
+    setSettingsError('');
+    setError('');
+    setSuccessMessage('');
+    setIsSavingSettings(true);
+
+    try {
+      const response = await client.patch('/accountant/settings', {
+        organizationCutPercentage: organizationCutValue,
+      });
+      const savedCut = Number(response.data.settings?.organizationCutPercentage ?? organizationCutValue);
+      setOrganizationCutPercentage(String(savedCut));
+      setSummary((currentSummary) =>
+        currentSummary
+          ? {
+              ...currentSummary,
+              organizationCutPercentage: savedCut,
+              doctorCutPercentage: 100 - savedCut,
+            }
+          : currentSummary
+      );
+      setSuccessMessage('Finance settings updated successfully.');
+    } catch (settingsUpdateError) {
+      const message = getErrorMessage(settingsUpdateError);
+      setSettingsError(message);
+      Alert.alert('Settings Update Failed', message);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!isValidMonth) {
@@ -113,6 +188,12 @@ const ManageSalariesScreen = () => {
       });
       setSalaries(response.data.salaries || []);
       setSummary(response.data.summary || null);
+      const generatedCut = response.data.summary?.organizationCutPercentage;
+
+      if (Number.isFinite(Number(generatedCut))) {
+        setOrganizationCutPercentage(String(generatedCut));
+      }
+
       setSuccessMessage('Salaries generated successfully.');
     } catch (generateError) {
       const message = getErrorMessage(generateError);
@@ -144,6 +225,7 @@ const ManageSalariesScreen = () => {
   const renderSalary = ({ item }) => {
     const isPaid = item.status === 'Paid';
     const isPaying = payingId === item._id;
+    const calculation = item.calculation || {};
 
     return (
       <View style={styles.card}>
@@ -165,14 +247,21 @@ const ManageSalariesScreen = () => {
         </View>
 
         <View style={styles.detailsPanel}>
-          <DetailRow label="Month" value={item.month} />
+          <DetailRow styles={styles} label="Month" value={item.month} />
           <DetailRow
+            styles={styles}
             label="Doctor Share"
             value={formatCurrency(item.doctorConsultationShare)}
           />
           <DetailRow
+            styles={styles}
             label="Organization Source"
             value={formatCurrency(item.organizationShareSource)}
+          />
+          <DetailRow
+            styles={styles}
+            label="Org Cut Snapshot"
+            value={formatPercentage(calculation.organizationCutPercentage)}
           />
         </View>
 
@@ -199,7 +288,37 @@ const ManageSalariesScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Manage Salaries</Text>
-      <Text style={styles.subtitle}>Generate monthly salary records from consultation and pharmacy income.</Text>
+      <Text style={styles.subtitle}>
+        Configure finance splits and generate monthly salary records from consultation and pharmacy income.
+      </Text>
+
+      <View style={styles.settingsPanel}>
+        <Text style={styles.panelTitle}>Finance Configuration</Text>
+        <Text style={styles.panelText}>
+          Set the organization percentage used when new doctor salary calculations are generated.
+        </Text>
+        <InputField
+          placeholder="Organization cut percentage"
+          value={organizationCutPercentage}
+          onChangeText={(value) => {
+            setOrganizationCutPercentage(value);
+            setSettingsError('');
+          }}
+          keyboardType="decimal-pad"
+          error={settingsError}
+          helperText={
+            isValidOrganizationCut
+              ? `Doctor cut: ${formatPercentage(100 - organizationCutValue)}`
+              : 'Enter a percentage from 0 to 100.'
+          }
+        />
+        <CustomButton
+          title="Save Settings"
+          onPress={handleSaveSettings}
+          loading={isSavingSettings}
+          disabled={!isValidOrganizationCut}
+        />
+      </View>
 
       <View style={styles.panel}>
         <Text style={styles.inputLabel}>Salary Month</Text>
@@ -208,6 +327,7 @@ const ManageSalariesScreen = () => {
           value={month}
           onChangeText={setMonth}
           autoCapitalize="none"
+          error={!isValidMonth ? 'Use YYYY-MM format.' : ''}
         />
         <CustomButton
           title="Generate Salaries"
@@ -219,10 +339,12 @@ const ManageSalariesScreen = () => {
 
       {summary ? (
         <View style={styles.summaryPanel}>
-          <DetailRow label="Consultation Income" value={formatCurrency(summary.consultationIncome)} />
-          <DetailRow label="Paid Pharmacy Fees" value={formatCurrency(summary.pharmacyIncome)} />
-          <DetailRow label="Organization Pool" value={formatCurrency(summary.organizationPool)} />
-          <DetailRow label="Staff Pool Share" value={formatCurrency(summary.staffPoolShare)} />
+          <DetailRow styles={styles} label="Consultation Income" value={formatCurrency(summary.consultationIncome)} />
+          <DetailRow styles={styles} label="Paid Pharmacy Fees" value={formatCurrency(summary.pharmacyIncome)} />
+          <DetailRow styles={styles} label="Organization Pool" value={formatCurrency(summary.organizationPool)} />
+          <DetailRow styles={styles} label="Staff Pool Share" value={formatCurrency(summary.staffPoolShare)} />
+          <DetailRow styles={styles} label="Organization Cut" value={formatPercentage(summary.organizationCutPercentage)} />
+          <DetailRow styles={styles} label="Doctor Cut" value={formatPercentage(summary.doctorCutPercentage)} />
         </View>
       ) : null}
 
@@ -241,7 +363,7 @@ const ManageSalariesScreen = () => {
         </View>
       </View>
 
-      {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+      <ErrorMessage message={successMessage} type="success" />
       <ErrorMessage message={error} />
 
       <FlatList
@@ -250,7 +372,16 @@ const ManageSalariesScreen = () => {
         renderItem={renderSalary}
         contentContainerStyle={salaries.length ? styles.list : styles.emptyList}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchSalaries(true)} />
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => {
+              fetchSalaries(true);
+              fetchFinanceSettings();
+            }}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.surfaceElevated}
+          />
         }
         ListEmptyComponent={
           <Text style={styles.emptyText}>No salary records found for this month.</Text>
@@ -260,7 +391,7 @@ const ManageSalariesScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -278,13 +409,38 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginBottom: 14,
   },
-  panel: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 8,
+  settingsPanel: {
+    backgroundColor: colors.surfaceGlass,
+    borderColor: colors.borderStrong,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
+    shadowColor: colors.shadowSoft,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    elevation: 2,
+  },
+  panel: {
+    backgroundColor: colors.surfaceGlass,
+    borderColor: colors.border,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 14,
+  },
+  panelTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  panelText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 12,
+    marginTop: 5,
   },
   inputLabel: {
     color: colors.text,
@@ -293,9 +449,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   summaryPanel: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     gap: 8,
     marginBottom: 12,
@@ -307,9 +463,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   summaryCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     flex: 1,
     padding: 10,
@@ -325,16 +481,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 3,
   },
-  success: {
-    backgroundColor: colors.successBackground,
-    borderRadius: 8,
-    color: colors.success,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
   list: {
     paddingBottom: 24,
   },
@@ -343,12 +489,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     padding: 14,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -382,8 +533,8 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
   pendingStatus: {
-    backgroundColor: '#FEF3C7',
-    color: '#B45309',
+    backgroundColor: colors.warningBackground,
+    color: colors.warning,
   },
   amountRow: {
     alignItems: 'center',

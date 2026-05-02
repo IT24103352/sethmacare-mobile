@@ -2,20 +2,21 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
-const ErrorMessage = ({ message, style, textStyle }) => {
+const ErrorMessage = ({ message, type = 'error', style, textStyle }) => {
   const { colors } = useTheme();
   const styles = createStyles(colors);
+  const tone = type === 'success' ? 'success' : type === 'info' ? 'info' : 'error';
 
   if (!message) {
     return null;
   }
 
   return (
-    <View style={[styles.toast, style]}>
-      <View style={styles.iconBubble}>
-        <Text style={styles.iconText}>!</Text>
+    <View style={[styles.toast, styles[`${tone}Toast`], style]}>
+      <View style={[styles.iconBubble, styles[`${tone}IconBubble`]]}>
+        <Text style={styles.iconText}>{tone === 'success' ? 'OK' : '!'}</Text>
       </View>
-      <Text style={[styles.text, textStyle]}>{message}</Text>
+      <Text style={[styles.text, styles[`${tone}Text`], textStyle]}>{message}</Text>
     </View>
   );
 };
@@ -23,8 +24,6 @@ const ErrorMessage = ({ message, style, textStyle }) => {
 const createStyles = (colors) => StyleSheet.create({
   toast: {
     alignItems: 'center',
-    backgroundColor: colors.errorBackground,
-    borderColor: colors.error,
     borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
@@ -38,25 +37,53 @@ const createStyles = (colors) => StyleSheet.create({
     shadowRadius: 18,
     elevation: 2,
   },
+  errorToast: {
+    backgroundColor: colors.errorBackground,
+    borderColor: colors.error,
+  },
+  successToast: {
+    backgroundColor: colors.successBackground,
+    borderColor: colors.success,
+  },
+  infoToast: {
+    backgroundColor: colors.infoBackground,
+    borderColor: colors.info,
+  },
   iconBubble: {
     alignItems: 'center',
-    backgroundColor: colors.error,
     borderRadius: 999,
     height: 22,
     justifyContent: 'center',
     width: 22,
   },
+  errorIconBubble: {
+    backgroundColor: colors.error,
+  },
+  successIconBubble: {
+    backgroundColor: colors.success,
+  },
+  infoIconBubble: {
+    backgroundColor: colors.info,
+  },
   iconText: {
     color: colors.white,
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '900',
   },
   text: {
-    color: colors.error,
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
     lineHeight: 20,
+  },
+  errorText: {
+    color: colors.error,
+  },
+  successText: {
+    color: colors.success,
+  },
+  infoText: {
+    color: colors.info,
   },
 });
 
