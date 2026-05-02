@@ -17,7 +17,7 @@ import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import InputField from '../../components/InputField';
 import { useAuth } from '../../context/AuthContext';
-import colors from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 
 const genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
@@ -92,34 +92,34 @@ const getInitials = (value) => {
     .join('');
 };
 
-const ReadOnlyField = ({ label, value, wide = false }) => (
-  <View style={[styles.fieldCard, wide && styles.wideField]}>
-    <Text style={styles.fieldLabel}>{label}</Text>
-    <Text style={styles.fieldValue}>{getDisplayValue(value)}</Text>
+const ReadOnlyField = ({ label, value, wide = false, sx }) => (
+  <View style={[sx.fieldCard, wide && sx.wideField]}>
+    <Text style={sx.fieldLabel}>{label}</Text>
+    <Text style={sx.fieldValue}>{getDisplayValue(value)}</Text>
   </View>
 );
 
-const LockedField = ({ label, value }) => (
-  <View style={styles.lockedField}>
-    <Text style={styles.inputLabel}>{label}</Text>
-    <Text style={styles.lockedValue}>{getDisplayValue(value)}</Text>
+const LockedField = ({ label, value, sx }) => (
+  <View style={sx.lockedField}>
+    <Text style={sx.inputLabel}>{label}</Text>
+    <Text style={sx.lockedValue}>{getDisplayValue(value)}</Text>
   </View>
 );
 
-const SalaryRow = ({ salary }) => (
-  <View style={styles.salaryRow}>
-    <View style={styles.salaryMain}>
-      <Text style={styles.salaryMonth}>{salary.month}</Text>
-      <Text style={styles.salaryMeta}>
+const SalaryRow = ({ salary, sx }) => (
+  <View style={sx.salaryRow}>
+    <View style={sx.salaryMain}>
+      <Text style={sx.salaryMonth}>{salary.month}</Text>
+      <Text style={sx.salaryMeta}>
         {salary.roleSnapshot || 'Staff'} salary
       </Text>
     </View>
-    <View style={styles.salaryAmountBox}>
-      <Text style={styles.salaryAmount}>{formatCurrency(salary.amount)}</Text>
+    <View style={sx.salaryAmountBox}>
+      <Text style={sx.salaryAmount}>{formatCurrency(salary.amount)}</Text>
       <Text
         style={[
-          styles.salaryStatus,
-          salary.status === 'Paid' ? styles.salaryPaid : styles.salaryPending,
+          sx.salaryStatus,
+          salary.status === 'Paid' ? sx.salaryPaid : sx.salaryPending,
         ]}
       >
         {salary.status}
@@ -130,6 +130,8 @@ const SalaryRow = ({ salary }) => (
 
 const MyProfile = () => {
   const { user, updateProfile, checkToken } = useAuth();
+  const { colors, theme, isDark, toggleTheme } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const isDoctor = user?.role === 'Doctor';
   const isStaff = Boolean(user?.role && user.role !== 'Patient');
   const doctorSpecialization = user?.specialization || user?.doctorProfile?.specialization || '';
@@ -403,6 +405,39 @@ const MyProfile = () => {
           </View>
         </View>
 
+        <View style={styles.themePanel}>
+          <View style={styles.themeCopy}>
+            <Text style={styles.themeEyebrow}>Appearance</Text>
+            <Text style={styles.themeTitle}>{isDark ? 'Dark mode' : 'Light mode'}</Text>
+          </View>
+          <View style={styles.themeToggle}>
+            {['light', 'dark'].map((mode) => {
+              const isSelected = theme === mode;
+
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  activeOpacity={0.82}
+                  onPress={isSelected ? undefined : toggleTheme}
+                  style={[
+                    styles.themeToggleOption,
+                    isSelected && styles.selectedThemeToggleOption,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.themeToggleText,
+                      isSelected && styles.selectedThemeToggleText,
+                    ]}
+                  >
+                    {mode === 'light' ? 'Light' : 'Dark'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         <View style={styles.topActions}>
           {!isEditing ? (
             <TouchableOpacity
@@ -419,17 +454,17 @@ const MyProfile = () => {
 
         {!isEditing ? (
           <View style={styles.fieldGrid}>
-            <ReadOnlyField label="User ID" value={user?.userCode} />
-            <ReadOnlyField label="Username" value={user?.username} />
-            <ReadOnlyField label="Email Address" value={user?.email} wide />
-            <ReadOnlyField label="Role" value={user?.role} />
-            <ReadOnlyField label="Phone Number" value={user?.phoneNumber} />
-            <ReadOnlyField label="NIC Number" value={displayNic} />
-            <ReadOnlyField label="Gender" value={user?.gender} />
-            <ReadOnlyField label="Date of Birth" value={displayDateOfBirth} />
+            <ReadOnlyField label="User ID" value={user?.userCode} sx={styles} />
+            <ReadOnlyField label="Username" value={user?.username} sx={styles} />
+            <ReadOnlyField label="Email Address" value={user?.email} wide sx={styles} />
+            <ReadOnlyField label="Role" value={user?.role} sx={styles} />
+            <ReadOnlyField label="Phone Number" value={user?.phoneNumber} sx={styles} />
+            <ReadOnlyField label="NIC Number" value={displayNic} sx={styles} />
+            <ReadOnlyField label="Gender" value={user?.gender} sx={styles} />
+            <ReadOnlyField label="Date of Birth" value={displayDateOfBirth} sx={styles} />
             {isDoctor ? (
               <>
-                <ReadOnlyField label="Specialization" value={doctorSpecialization} />
+                <ReadOnlyField label="Specialization" value={doctorSpecialization} sx={styles} />
                 <ReadOnlyField
                   label="Consultation Fee"
                   value={
@@ -437,16 +472,17 @@ const MyProfile = () => {
                       ? `Rs. ${Number(doctorConsultationFee).toLocaleString()}`
                       : ''
                   }
+                  sx={styles}
                 />
               </>
             ) : null}
-            <ReadOnlyField label="Address" value={user?.address} wide />
+            <ReadOnlyField label="Address" value={user?.address} wide sx={styles} />
           </View>
         ) : (
           <View style={styles.formCard}>
-            <LockedField label="Username" value={user?.username} />
-            <LockedField label="Email Address" value={user?.email} />
-            <LockedField label="Role" value={user?.role} />
+            <LockedField label="Username" value={user?.username} sx={styles} />
+            <LockedField label="Email Address" value={user?.email} sx={styles} />
+            <LockedField label="Role" value={user?.role} sx={styles} />
 
             <Text style={styles.inputLabel}>Phone Number</Text>
             <InputField
@@ -574,7 +610,7 @@ const MyProfile = () => {
             ) : salaries.length ? (
               <View style={styles.salaryList}>
                 {salaries.map((salary) => (
-                  <SalaryRow key={salary._id} salary={salary} />
+                  <SalaryRow key={salary._id} salary={salary} sx={styles} />
                 ))}
               </View>
             ) : (
@@ -587,7 +623,7 @@ const MyProfile = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors, isDark) => StyleSheet.create({
   keyboardView: {
     flex: 1,
     backgroundColor: colors.background,
@@ -598,20 +634,25 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 24,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 14,
     marginBottom: 12,
     padding: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: isDark ? 0.26 : 0.12,
+    shadowRadius: 24,
+    elevation: 3,
   },
   avatar: {
     alignItems: 'center',
-    backgroundColor: colors.background,
-    borderColor: colors.border,
-    borderRadius: 8,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.borderStrong,
+    borderRadius: 22,
     borderWidth: 1,
     height: 88,
     justifyContent: 'center',
@@ -646,6 +687,69 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
+  themePanel: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceGlass,
+    borderColor: colors.border,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    padding: 12,
+    shadowColor: colors.shadowSoft,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: isDark ? 0.22 : 0.1,
+    shadowRadius: 18,
+    elevation: 2,
+  },
+  themeCopy: {
+    flex: 1,
+  },
+  themeEyebrow: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  themeTitle: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginTop: 3,
+  },
+  themeToggle: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 4,
+  },
+  themeToggleOption: {
+    borderRadius: 999,
+    minWidth: 62,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  selectedThemeToggleOption: {
+    backgroundColor: colors.primary,
+    shadowColor: colors.shadowSoft,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  themeToggleText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  selectedThemeToggleText: {
+    color: colors.white,
+  },
   imageButton: {
     alignSelf: 'flex-start',
     marginTop: 12,
@@ -661,7 +765,7 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: colors.primary,
-    borderRadius: 8,
+    borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -676,13 +780,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   fieldCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 18,
     borderWidth: 1,
     minWidth: 145,
     padding: 14,
     width: '48%',
+    shadowColor: colors.shadowSoft,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 1,
   },
   wideField: {
     width: '100%',
@@ -700,16 +809,21 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   formCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 22,
     borderWidth: 1,
     padding: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: isDark ? 0.22 : 0.1,
+    shadowRadius: 22,
+    elevation: 2,
   },
   lockedField: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 14,
     padding: 12,
@@ -734,10 +848,11 @@ const styles = StyleSheet.create({
   },
   optionButton: {
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    backgroundColor: colors.inputBackground,
   },
   selectedOption: {
     backgroundColor: colors.primary,
@@ -755,8 +870,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
+    borderRadius: 16,
+    backgroundColor: colors.inputBackground,
     justifyContent: 'center',
     marginBottom: 14,
     paddingHorizontal: 14,
@@ -772,9 +887,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   datePickerBox: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     marginBottom: 14,
     overflow: 'hidden',
@@ -798,12 +913,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   salarySection: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceGlass,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 22,
     borderWidth: 1,
     marginTop: 16,
     padding: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: isDark ? 0.22 : 0.1,
+    shadowRadius: 22,
+    elevation: 2,
   },
   salaryTitle: {
     color: colors.text,
@@ -822,9 +942,9 @@ const styles = StyleSheet.create({
   },
   salaryRow: {
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
     flexDirection: 'row',
     gap: 12,
@@ -866,8 +986,8 @@ const styles = StyleSheet.create({
     color: colors.success,
   },
   salaryPending: {
-    backgroundColor: '#FEF3C7',
-    color: '#B45309',
+    backgroundColor: colors.warningBackground,
+    color: colors.warning,
   },
   salaryEmpty: {
     color: colors.textMuted,

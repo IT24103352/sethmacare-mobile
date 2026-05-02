@@ -1,11 +1,11 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
 } from 'react-native';
-import colors from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 const CustomButton = ({
   title,
@@ -16,17 +16,19 @@ const CustomButton = ({
   style,
   textStyle,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const isSecondary = type === 'secondary';
   const isDisabled = disabled || loading;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.82}
+    <Pressable
       onPress={onPress}
       disabled={isDisabled}
-      style={[
+      style={({ pressed }) => [
         styles.button,
         isSecondary ? styles.secondaryButton : styles.primaryButton,
+        pressed && !isDisabled && styles.pressedButton,
         isDisabled && styles.disabledButton,
         style,
       ]}
@@ -44,33 +46,46 @@ const CustomButton = ({
           {title}
         </Text>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   button: {
     minHeight: 48,
-    borderRadius: 8,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
     paddingVertical: 12,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 3,
   },
   primaryButton: {
     backgroundColor: colors.primary,
-  },
-  secondaryButton: {
-    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.primary,
   },
+  secondaryButton: {
+    backgroundColor: colors.surfaceGlass,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  pressedButton: {
+    opacity: 0.82,
+    transform: [{ scale: 0.98 }],
+  },
   disabledButton: {
     opacity: 0.65,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   primaryTitle: {
     color: colors.white,

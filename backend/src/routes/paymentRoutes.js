@@ -5,6 +5,7 @@ import {
   getPatientPayments,
   getPaymentById,
   confirmPayment,
+  rejectPayment,
   removePayment,
 } from '../controllers/paymentController.js';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
@@ -19,6 +20,7 @@ router.use(protect, authorizeRoles('Accountant', 'Admin'));
 router.get('/', getAllPayments);
 router.get('/:id', getPaymentById);
 router.patch('/:id/confirm', confirmPayment);
+router.patch('/:id/reject', rejectPayment);
 router.delete('/:id', removePayment);
 
 export default router;

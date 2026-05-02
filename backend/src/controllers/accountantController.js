@@ -1,4 +1,5 @@
 import Appointment from '../models/Appointment.js';
+import FinanceSettings from '../models/FinanceSettings.js';
 import Payment from '../models/Payment.js';
 import Prescription from '../models/Prescription.js';
 import Salary from '../models/Salary.js';
@@ -6,8 +7,13 @@ import User from '../models/User.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 const salaryMonthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
+const yearPattern = /^\d{4}$/;
+const defaultOrganizationCutPercentage = 30;
+const financeSettingsId = '000000000000000000000001';
 
 const roundCurrency = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+const normalizePercentage = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
 const getMonthRange = (month) => {
   if (!salaryMonthPattern.test(month || '')) {
@@ -22,6 +28,104 @@ const getMonthRange = (month) => {
 
   return { start, end };
 };
+
+const getFinanceSettings = async () =>
+  FinanceSettings.findByIdAndUpdate(
+    financeSettingsId,
+    {
+      $setOnInsert: {
+        organizationCutPercentage: defaultOrganizationCutPercentage,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true,
+    }
+  );
+
+const getReportRange = (query) => {
+  if (query.month) {
+    const requestedMonth = String(query.month).trim();
+
+    if (salaryMonthPattern.test(requestedMonth)) {
+      return {
+        ...getMonthRange(requestedMonth),
+        salaryMatch: { month: requestedMonth },
+        label: requestedMonth,
+      };
+    }
+
+    if (query.year && /^(0?[1-9]|1[0-2])$/.test(requestedMonth)) {
+      const requestedYear = String(query.year).trim();
+
+      if (!yearPattern.test(requestedYear)) {
+        const error = new Error('Year must use YYYY format.');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const normalizedMonth = requestedMonth.padStart(2, '0');
+      const salaryMonth = `${requestedYear}-${normalizedMonth}`;
+
+      return {
+        ...getMonthRange(salaryMonth),
+        salaryMatch: { month: salaryMonth },
+        label: salaryMonth,
+      };
+    }
+
+    const error = new Error('Month must use YYYY-MM format, or use month 1-12 with year YYYY.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (query.year) {
+    const requestedYear = String(query.year).trim();
+
+    if (!yearPattern.test(requestedYear)) {
+      const error = new Error('Year must use YYYY format.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const start = new Date(Date.UTC(Number(requestedYear), 0, 1, 0, 0, 0, 0));
+    const end = new Date(Date.UTC(Number(requestedYear) + 1, 0, 1, 0, 0, 0, 0));
+
+    return {
+      start,
+      end,
+      salaryMatch: { month: new RegExp(`^${requestedYear}-`) },
+      label: requestedYear,
+    };
+  }
+
+  return {
+    start: null,
+    end: null,
+    salaryMatch: {},
+    label: 'all-time',
+  };
+};
+
+const buildDateMatch = (field, range) => {
+  if (!range.start || !range.end) {
+    return {};
+  }
+
+  return {
+    [field]: {
+      $gte: range.start,
+      $lt: range.end,
+    },
+  };
+};
+
+const getAggregateSummary = (result) => ({
+  total: roundCurrency(result[0]?.total || 0),
+  count: result[0]?.count || 0,
+});
 
 const buildAppointmentQuery = (status) => {
   if (!status || status === 'All') {
@@ -92,7 +196,7 @@ const generateSalaries = asyncHandler(async (req, res, next) => {
     return next(error);
   }
 
-  const [confirmedPayments, paidPharmacyPrescriptions, activeStaff] = await Promise.all([
+  const [confirmedPayments, paidPharmacyPrescriptions, activeStaff, financeSettings] = await Promise.all([
     Payment.find({
       status: 'Confirmed',
       paymentDate: {
@@ -111,7 +215,15 @@ const generateSalaries = asyncHandler(async (req, res, next) => {
       role: { $ne: 'Patient' },
       isActive: true,
     }).sort({ role: 1, userCode: 1 }),
+    getFinanceSettings(),
   ]);
+
+  const organizationCutPercentage = normalizePercentage(
+    financeSettings?.organizationCutPercentage ?? defaultOrganizationCutPercentage
+  );
+  const doctorCutPercentage = normalizePercentage(100 - organizationCutPercentage);
+  const organizationCutMultiplier = organizationCutPercentage / 100;
+  const doctorCutMultiplier = doctorCutPercentage / 100;
 
   const doctorIncomeById = new Map();
   const consultationIncome = confirmedPayments.reduce((total, payment) => {
@@ -129,7 +241,9 @@ const generateSalaries = asyncHandler(async (req, res, next) => {
     (total, prescription) => total + (Number(prescription.pharmacyFeeAmount) || 0),
     0
   );
-  const organizationPool = roundCurrency(consultationIncome * 0.3 + pharmacyIncome);
+  const organizationPool = roundCurrency(
+    consultationIncome * organizationCutMultiplier + pharmacyIncome
+  );
   const nonDoctorStaff = activeStaff.filter((staff) => staff.role !== 'Doctor');
   const staffPoolShare = roundCurrency(
     nonDoctorStaff.length > 0 ? organizationPool / nonDoctorStaff.length : 0
@@ -139,9 +253,11 @@ const generateSalaries = asyncHandler(async (req, res, next) => {
     activeStaff.map(async (staff) => {
       const doctorConsultationIncome = roundCurrency(doctorIncomeById.get(staff._id.toString()) || 0);
       const doctorConsultationShare =
-        staff.role === 'Doctor' ? roundCurrency(doctorConsultationIncome * 0.7) : 0;
+        staff.role === 'Doctor' ? roundCurrency(doctorConsultationIncome * doctorCutMultiplier) : 0;
       const organizationShareSource =
-        staff.role === 'Doctor' ? roundCurrency(doctorConsultationIncome * 0.3) : staffPoolShare;
+        staff.role === 'Doctor'
+          ? roundCurrency(doctorConsultationIncome * organizationCutMultiplier)
+          : staffPoolShare;
       const amount = staff.role === 'Doctor' ? doctorConsultationShare : staffPoolShare;
 
       const salaryPayload = {
@@ -158,6 +274,8 @@ const generateSalaries = asyncHandler(async (req, res, next) => {
           organizationPool,
           doctorConsultationIncome,
           staffPoolShare,
+          organizationCutPercentage,
+          doctorCutPercentage,
         },
         generatedBy: req.user._id,
       };
@@ -202,11 +320,176 @@ const generateSalaries = asyncHandler(async (req, res, next) => {
       consultationIncome: roundCurrency(consultationIncome),
       pharmacyIncome: roundCurrency(pharmacyIncome),
       organizationPool,
+      organizationCutPercentage,
+      doctorCutPercentage,
       staffPoolShare,
       staffCount: activeStaff.length,
       nonDoctorStaffCount: nonDoctorStaff.length,
     },
     salaries,
+  });
+});
+
+const updateFinanceSettings = asyncHandler(async (req, res, next) => {
+  const organizationCutPercentage = Number(req.body.organizationCutPercentage);
+
+  if (
+    !Number.isFinite(organizationCutPercentage) ||
+    organizationCutPercentage < 0 ||
+    organizationCutPercentage > 100
+  ) {
+    const error = new Error('organizationCutPercentage must be a number between 0 and 100.');
+    error.statusCode = 400;
+    return next(error);
+  }
+
+  const normalizedOrganizationCutPercentage = normalizePercentage(organizationCutPercentage);
+
+  const settings = await FinanceSettings.findByIdAndUpdate(
+    financeSettingsId,
+    {
+      organizationCutPercentage: normalizedOrganizationCutPercentage,
+    },
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true,
+    }
+  );
+
+  res.status(200).json({
+    success: true,
+    message: 'Finance settings updated successfully.',
+    settings,
+    summary: {
+      organizationCutPercentage: settings.organizationCutPercentage,
+      doctorCutPercentage: normalizePercentage(100 - settings.organizationCutPercentage),
+    },
+  });
+});
+
+const getFinancialReport = asyncHandler(async (req, res, next) => {
+  let range;
+
+  try {
+    range = getReportRange(req.query);
+  } catch (error) {
+    return next(error);
+  }
+
+  const financeSettings = await getFinanceSettings();
+  const organizationCutPercentage = normalizePercentage(
+    financeSettings?.organizationCutPercentage ?? defaultOrganizationCutPercentage
+  );
+  const doctorCutPercentage = normalizePercentage(100 - organizationCutPercentage);
+  const organizationCutMultiplier = organizationCutPercentage / 100;
+
+  const [consultationResult, pharmacyResult, liabilitiesResult, payoutsResult] =
+    await Promise.all([
+      Payment.aggregate([
+        {
+          $match: {
+            status: 'Confirmed',
+            ...buildDateMatch('paymentDate', range),
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Prescription.aggregate([
+        {
+          $match: {
+            pharmacyPaymentStatus: 'Paid',
+            ...buildDateMatch('pharmacyPaidAt', range),
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$pharmacyFeeAmount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Salary.aggregate([
+        {
+          $match: {
+            status: 'Pending',
+            ...range.salaryMatch,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Salary.aggregate([
+        {
+          $match: {
+            status: 'Paid',
+            ...range.salaryMatch,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+  const consultationRevenue = getAggregateSummary(consultationResult);
+  const pharmacyIncome = getAggregateSummary(pharmacyResult);
+  const unpaidLiabilities = getAggregateSummary(liabilitiesResult);
+  const paidPayouts = getAggregateSummary(payoutsResult);
+  const organizationConsultationRevenue = roundCurrency(
+    consultationRevenue.total * organizationCutMultiplier
+  );
+  const grossCashIn = roundCurrency(consultationRevenue.total + pharmacyIncome.total);
+  const operationalRevenue = roundCurrency(organizationConsultationRevenue + pharmacyIncome.total);
+  const netAfterPaidPayouts = roundCurrency(operationalRevenue - paidPayouts.total);
+  const estimatedNetPosition = roundCurrency(
+    operationalRevenue - paidPayouts.total - unpaidLiabilities.total
+  );
+
+  res.status(200).json({
+    success: true,
+    report: {
+      period: range.label,
+      settings: {
+        organizationCutPercentage,
+        doctorCutPercentage,
+      },
+      revenue: {
+        consultationRevenue,
+        organizationConsultationRevenue,
+        pharmacyIncome,
+        operationalRevenue,
+        grossCashIn,
+      },
+      liabilities: {
+        unpaidSalaries: unpaidLiabilities,
+      },
+      payouts: {
+        paidSalaries: paidPayouts,
+      },
+      assetsEstimate: {
+        grossCashIn,
+        netAfterPaidPayouts,
+      },
+      estimatedNetPosition,
+    },
   });
 });
 
@@ -316,6 +599,8 @@ export {
   getDashboardStats,
   getSalaries,
   generateSalaries,
+  updateFinanceSettings,
+  getFinancialReport,
   markSalaryPaid,
   getPaymentVerificationAppointments,
   verifyAppointmentPayment,

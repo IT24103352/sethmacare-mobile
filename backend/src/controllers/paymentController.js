@@ -209,6 +209,46 @@ const confirmPayment = asyncHandler(async (req, res, next) => {
   });
 });
 
+const rejectPayment = asyncHandler(async (req, res, next) => {
+  const payment = await Payment.findById(req.params.id);
+
+  if (!payment) {
+    const error = new Error('Payment not found.');
+    error.statusCode = 404;
+    return next(error);
+  }
+
+  if (payment.status !== 'Pending') {
+    const error = new Error('Only pending payments can be rejected.');
+    error.statusCode = 400;
+    return next(error);
+  }
+
+  const rejectedReason =
+    typeof req.body.rejectedReason === 'string' ? req.body.rejectedReason.trim() : '';
+
+  payment.status = 'Rejected';
+  payment.rejectedReason = rejectedReason;
+  payment.accountant = req.user._id;
+  payment.verifiedAt = new Date();
+  await payment.save();
+
+  await Appointment.findByIdAndUpdate(payment.appointment, {
+    paymentStatus: 'Rejected',
+  });
+
+  const populatedPayment = await Payment.findById(payment._id)
+    .populate('patient', 'username userCode email phoneNumber')
+    .populate('appointment', 'appointmentCode appointmentDate appointmentTime status paymentStatus consultationFee')
+    .populate('accountant', 'username userCode');
+
+  res.status(200).json({
+    success: true,
+    message: 'Payment rejected successfully.',
+    payment: populatedPayment,
+  });
+});
+
 const removePayment = asyncHandler(async (req, res, next) => {
   const payment = await Payment.findById(req.params.id);
 
@@ -246,5 +286,6 @@ export {
   getPatientPayments,
   getPaymentById,
   confirmPayment,
+  rejectPayment,
   removePayment,
 };

@@ -75,6 +75,18 @@ const salarySchema = new mongoose.Schema(
         min: 0,
         default: 0,
       },
+      organizationCutPercentage: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: 30,
+      },
+      doctorCutPercentage: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: 70,
+      },
     },
     generatedBy: {
       type: mongoose.Schema.Types.ObjectId,
