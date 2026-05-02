@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import client from '../../api/client';
+import AnnouncementCarousel from '../../components/AnnouncementCarousel';
 import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import { useAuth } from '../../context/AuthContext';
@@ -79,6 +80,8 @@ const PatientDashboard = ({ navigation }) => {
         <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchAppointments(true)} />
       }
     >
+      <AnnouncementCarousel />
+
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Patient Portal</Text>
         <Text style={styles.title}>Welcome, {displayName}</Text>

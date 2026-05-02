@@ -14,7 +14,7 @@ import InputField from '../../components/InputField';
 import colors from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
 
-const roles = ['Patient', 'Doctor', 'Receptionist', 'Accountant', 'Pharmacist'];
+const roles = ['Patient', 'Doctor'];
 
 const getErrorMessage = (error) =>
   error?.response?.data?.message || error?.message || 'Registration failed. Please try again.';

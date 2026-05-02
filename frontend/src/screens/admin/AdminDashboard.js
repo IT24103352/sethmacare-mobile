@@ -118,6 +118,12 @@ const AdminDashboard = ({ navigation }) => {
           style={styles.button}
         />
         <CustomButton
+          title="Manage Announcements"
+          type="secondary"
+          onPress={() => navigation.navigate('ManageAnnouncements')}
+          style={styles.button}
+        />
+        <CustomButton
           title="My Profile"
           type="secondary"
           onPress={() => navigation.navigate('MyProfile')}

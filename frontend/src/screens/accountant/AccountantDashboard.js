@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import client from '../../api/client';
+import AnnouncementCarousel from '../../components/AnnouncementCarousel';
 import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import { useAuth } from '../../context/AuthContext';
@@ -76,6 +77,8 @@ const AccountantDashboard = ({ navigation }) => {
         <RefreshControl refreshing={isRefreshing} onRefresh={() => fetchStats(true)} />
       }
     >
+      <AnnouncementCarousel />
+
       <View style={styles.header}>
         <Text style={styles.eyebrow}>Accountant Portal</Text>
         <Text style={styles.title}>Welcome back, {displayName}</Text>

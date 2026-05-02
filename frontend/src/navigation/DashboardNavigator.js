@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AdminDashboard from '../screens/admin/AdminDashboard';
 import ManageUsersScreen from '../screens/admin/ManageUsersScreen';
 import AdminAddUser from '../screens/admin/AdminAddUser';
+import ManageAnnouncementsScreen from '../screens/admin/ManageAnnouncementsScreen';
 import PatientDashboard from '../screens/patient/PatientDashboard';
 import DoctorListScreen from '../screens/patient/DoctorListScreen';
 import BookAppointmentScreen from '../screens/patient/BookAppointmentScreen';
@@ -40,6 +41,7 @@ const DashboardNavigator = () => {
             <Stack.Screen name="AdminHome" component={AdminDashboard} options={{ title: 'Admin Dashboard' }} />
             <Stack.Screen name="ManageUsers" component={ManageUsersScreen} options={{ title: 'Manage Users' }} />
             <Stack.Screen name="AdminAddUser" component={AdminAddUser} options={{ title: 'Add User' }} />
+            <Stack.Screen name="ManageAnnouncements" component={ManageAnnouncementsScreen} options={{ title: 'Manage Announcements' }} />
           </>
         );
       case 'Patient':
