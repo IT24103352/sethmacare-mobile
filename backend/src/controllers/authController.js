@@ -83,6 +83,28 @@ const getNextUserCode = async () => {
   return `${counter.prefix}${String(counter.seq).padStart(3, '0')}`;
 };
 
+const getNextUserCodes = async (count) => {
+  const counter = await Counter.findOneAndUpdate(
+    { key: 'user' },
+    {
+      $setOnInsert: { prefix: 'U' },
+      $inc: { seq: count },
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    }
+  );
+
+  const firstSeq = counter.seq - count + 1;
+
+  return Array.from(
+    { length: count },
+    (_, index) => `${counter.prefix}${String(firstSeq + index).padStart(3, '0')}`
+  );
+};
+
 const handleDuplicateKeyError = (error) => {
   if (error.code !== 11000) {
     return null;
@@ -94,6 +116,13 @@ const handleDuplicateKeyError = (error) => {
   duplicateError.statusCode = 409;
   return duplicateError;
 };
+
+const handleBulkInsertError = (error) => {
+  const writeError = error?.writeErrors?.[0]?.err || error?.writeErrors?.[0];
+  return handleDuplicateKeyError(error) || handleDuplicateKeyError(writeError || {});
+};
+
+const allowedRoles = ['Admin', 'Patient', 'Doctor', 'Receptionist', 'Accountant', 'Pharmacist'];
 
 const registerUser = async (req, res, next) => {
   try {
@@ -169,6 +198,118 @@ const registerUser = async (req, res, next) => {
   } catch (error) {
     const duplicateError = handleDuplicateKeyError(error);
     return next(duplicateError || error);
+  }
+};
+
+const bulkCreateUsers = async (req, res, next) => {
+  try {
+    const { users = [] } = req.body;
+
+    if (!Array.isArray(users) || users.length === 0) {
+      const error = new Error('users must be a non-empty array.');
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    const seenUsernames = new Set();
+    const seenEmails = new Set();
+
+    const normalizedUsers = users.map((user, index) => {
+      const rowNumber = index + 1;
+      const username = toOptionalString(user.username);
+      const email = toOptionalString(user.email)?.toLowerCase();
+      const password = toOptionalString(user.password);
+      const role = toOptionalString(user.role);
+      const specialization = toOptionalString(
+        user.specialization || user.doctorProfile?.specialization
+      );
+      const consultationFee = toOptionalNumber(
+        user.consultationFee ?? user.doctorProfile?.consultationFee
+      );
+
+      if (!username || !email || !password || !role) {
+        const error = new Error(
+          `Row ${rowNumber}: username, email, password, and role are required.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (!allowedRoles.includes(role)) {
+        const error = new Error(`Row ${rowNumber}: role must be one of ${allowedRoles.join(', ')}.`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (seenUsernames.has(username.toLowerCase())) {
+        const error = new Error(`Row ${rowNumber}: duplicate username "${username}" in import file.`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (seenEmails.has(email)) {
+        const error = new Error(`Row ${rowNumber}: duplicate email "${email}" in import file.`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      if (role === 'Doctor' && (!specialization || consultationFee === undefined)) {
+        const error = new Error(
+          `Row ${rowNumber}: Doctor users require specialization and consultationFee.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+
+      seenUsernames.add(username.toLowerCase());
+      seenEmails.add(email);
+
+      return {
+        username,
+        email,
+        password,
+        role,
+        specialization,
+        consultationFee,
+      };
+    });
+
+    const userCodes = await getNextUserCodes(normalizedUsers.length);
+    const docs = await Promise.all(
+      normalizedUsers.map(async (user, index) => {
+        const passwordHash = await bcrypt.hash(user.password, 10);
+        const isDoctor = user.role === 'Doctor';
+
+        return {
+          userCode: userCodes[index],
+          username: user.username,
+          email: user.email,
+          passwordHash,
+          role: user.role,
+          specialization: isDoctor ? user.specialization : undefined,
+          consultationFee: isDoctor ? user.consultationFee : undefined,
+          doctorProfile: isDoctor
+            ? {
+                specialization: user.specialization,
+                consultationFee: user.consultationFee,
+              }
+            : undefined,
+          confirmed: true,
+        };
+      })
+    );
+
+    const createdUsers = await User.insertMany(docs, { ordered: true });
+
+    res.status(201).json({
+      success: true,
+      message: `${createdUsers.length} users imported successfully.`,
+      count: createdUsers.length,
+      users: createdUsers.map(buildSafeUser),
+    });
+  } catch (error) {
+    const bulkInsertError = handleBulkInsertError(error);
+    return next(bulkInsertError || error);
   }
 };
 
@@ -396,6 +537,7 @@ const deleteUser = async (req, res, next) => {
 
 export {
   registerUser,
+  bulkCreateUsers,
   loginUser,
   getMe,
   updateMe,

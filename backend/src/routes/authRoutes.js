@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   registerUser,
+  bulkCreateUsers,
   loginUser,
   getMe,
   updateMe,
@@ -18,6 +19,7 @@ router.post('/login', loginUser);
 router.get('/me', protect, getMe);
 router.patch('/me', protect, updateMe);
 
+router.post('/users/bulk', protect, authorizeRoles('Admin'), bulkCreateUsers);
 router.get('/users', protect, authorizeRoles('Admin'), getAllUsers);
 router.get('/users/pending', protect, authorizeRoles('Admin'), getPendingUsers);
 router.get('/pending', protect, authorizeRoles('Admin'), getPendingUsers);
