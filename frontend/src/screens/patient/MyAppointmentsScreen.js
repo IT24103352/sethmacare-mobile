@@ -36,6 +36,26 @@ const getBadgeStyle = (status) => {
   return styles.neutralBadge;
 };
 
+const getAppointmentPaymentKeys = (appointment) => {
+  const keys = [];
+  const appointmentRef = appointment?.appointment;
+
+  if (typeof appointmentRef === 'string') {
+    keys.push(appointmentRef);
+  } else if (appointmentRef?._id) {
+    keys.push(appointmentRef._id);
+  }
+
+  if (appointmentRef?.appointmentCode) {
+    keys.push(appointmentRef.appointmentCode);
+  }
+
+  return keys;
+};
+
+const getPaymentRejectionReason = (appointment) =>
+  appointment.payment?.rejectedReason || appointment.rejectedReason || '';
+
 const Detail = ({ label, value }) => (
   <View style={styles.detailItem}>
     <Text style={styles.detailLabel}>{label}</Text>
@@ -59,8 +79,29 @@ const MyAppointmentsScreen = () => {
     setError('');
 
     try {
-      const response = await client.get('/patient/appointments/my');
-      setAppointments(response.data.appointments || []);
+      const [appointmentsResponse, paymentsResponse] = await Promise.all([
+        client.get('/patient/appointments/my'),
+        client.get('/payments/patient/me'),
+      ]);
+      const paymentsByAppointment = new Map();
+
+      (paymentsResponse.data.payments || []).forEach((payment) => {
+        getAppointmentPaymentKeys(payment).forEach((key) => {
+          paymentsByAppointment.set(String(key), payment);
+        });
+      });
+
+      const appointmentsWithPayments = (appointmentsResponse.data.appointments || []).map(
+        (appointment) => ({
+          ...appointment,
+          payment:
+            paymentsByAppointment.get(String(appointment._id)) ||
+            paymentsByAppointment.get(String(appointment.appointmentCode)) ||
+            null,
+        })
+      );
+
+      setAppointments(appointmentsWithPayments);
     } catch (fetchError) {
       setError(getErrorMessage(fetchError));
     } finally {
@@ -94,6 +135,8 @@ const MyAppointmentsScreen = () => {
   const renderAppointment = ({ item }) => {
     const doctorName = item.doctor?.username || item.doctorSnapshot?.username || 'Doctor';
     const canCancel = item.status !== 'Confirmed' && item.status !== 'Completed' && item.status !== 'Prescribed';
+    const paymentStatus = item.payment?.status || item.paymentStatus || 'Pending';
+    const rejectionReason = getPaymentRejectionReason(item);
 
     return (
       <View style={styles.card}>
@@ -110,8 +153,8 @@ const MyAppointmentsScreen = () => {
           <Detail label="Time" value={item.appointmentTime} />
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Payment</Text>
-            <Text style={[styles.inlineBadge, getBadgeStyle(item.paymentStatus)]}>
-              {item.paymentStatus || 'Pending'}
+            <Text style={[styles.inlineBadge, getBadgeStyle(paymentStatus)]}>
+              {paymentStatus}
             </Text>
           </View>
           <View style={styles.detailItem}>
@@ -121,6 +164,13 @@ const MyAppointmentsScreen = () => {
             </Text>
           </View>
         </View>
+
+        {paymentStatus === 'Rejected' && rejectionReason ? (
+          <View style={styles.rejectionBox}>
+            <Text style={styles.rejectionLabel}>Payment Rejected</Text>
+            <Text style={styles.rejectionText}>Reason: {rejectionReason}</Text>
+          </View>
+        ) : null}
 
         {canCancel ? (
           <CustomButton
@@ -256,6 +306,27 @@ const styles = StyleSheet.create({
   neutralBadge: {
     backgroundColor: colors.errorBackground,
     color: colors.error,
+  },
+  rejectionBox: {
+    backgroundColor: colors.errorBackground,
+    borderColor: colors.error,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 12,
+    padding: 10,
+  },
+  rejectionLabel: {
+    color: colors.error,
+    fontSize: 12,
+    fontWeight: '900',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+  },
+  rejectionText: {
+    color: colors.error,
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   cancelButton: {
     marginTop: 12,

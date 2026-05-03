@@ -148,6 +148,10 @@ const MockPaymentForm = ({
       nextValue = value.replace(/\D/g, '').slice(0, 3);
     }
 
+    if (field === 'nameOnCard') {
+      nextValue = value.replace(/[^a-zA-Z\s]/g, '');
+    }
+
     onCardDetailsChange({
       ...cardDetails,
       [field]: nextValue,
