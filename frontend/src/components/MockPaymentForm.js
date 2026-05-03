@@ -133,31 +133,6 @@ const MockPaymentForm = ({
   onCardDetailsChange,
   onOnlineDetailsChange,
 }) => {
-  const updateCardDetails = (field, value) => {
-    let nextValue = value;
-
-    if (field === 'cardNumber') {
-      nextValue = value.replace(/\D/g, '').slice(0, 16);
-    }
-
-    if (field === 'expiryDate') {
-      nextValue = formatExpiryDate(value);
-    }
-
-    if (field === 'cvv') {
-      nextValue = value.replace(/\D/g, '').slice(0, 3);
-    }
-
-    if (field === 'nameOnCard') {
-      nextValue = value.replace(/[^a-zA-Z\s]/g, '');
-    }
-
-    onCardDetailsChange({
-      ...cardDetails,
-      [field]: nextValue,
-    });
-  };
-
   const updateOnlineDetails = (field, value) => {
     onOnlineDetailsChange({
       ...onlineDetails,
@@ -222,9 +197,14 @@ const MockPaymentForm = ({
       <InputField
         placeholder="16 digit card number"
         value={cardDetails.cardNumber}
-        onChangeText={(value) => updateCardDetails('cardNumber', value)}
         keyboardType="numeric"
         maxLength={16}
+        onChangeText={(text) =>
+          onCardDetailsChange({
+            ...cardDetails,
+            cardNumber: text.replace(/\D/g, '').slice(0, 16),
+          })
+        }
       />
       <View style={styles.splitRow}>
         <View style={styles.splitItem}>
@@ -232,9 +212,14 @@ const MockPaymentForm = ({
           <InputField
             placeholder="MM/YY"
             value={cardDetails.expiryDate}
-            onChangeText={(value) => updateCardDetails('expiryDate', value)}
             keyboardType="numeric"
             maxLength={5}
+            onChangeText={(text) =>
+              onCardDetailsChange({
+                ...cardDetails,
+                expiryDate: formatExpiryDate(text),
+              })
+            }
           />
         </View>
         <View style={styles.splitItem}>
@@ -242,10 +227,15 @@ const MockPaymentForm = ({
           <InputField
             placeholder="3 digits"
             value={cardDetails.cvv}
-            onChangeText={(value) => updateCardDetails('cvv', value)}
             keyboardType="numeric"
-            secureTextEntry
             maxLength={3}
+            secureTextEntry
+            onChangeText={(text) =>
+              onCardDetailsChange({
+                ...cardDetails,
+                cvv: text.replace(/\D/g, '').slice(0, 3),
+              })
+            }
           />
         </View>
       </View>
@@ -253,8 +243,13 @@ const MockPaymentForm = ({
       <InputField
         placeholder="Name on card"
         value={cardDetails.nameOnCard}
-        onChangeText={(value) => updateCardDetails('nameOnCard', value)}
         autoCapitalize="words"
+        onChangeText={(text) =>
+          onCardDetailsChange({
+            ...cardDetails,
+            nameOnCard: text.replace(/[^a-zA-Z\s]/g, ''),
+          })
+        }
       />
       {validationError ? (
         <Text style={styles.validationText}>{validationError}</Text>
