@@ -118,6 +118,12 @@ const ReceptionistDashboard = ({ navigation }) => {
           style={styles.button}
         />
         <CustomButton
+          title="Manage Schedules"
+          type="secondary"
+          onPress={() => navigation.navigate('ManageSchedules')}
+          style={styles.button}
+        />
+        <CustomButton
           title="My Profile"
           type="secondary"
           onPress={() => navigation.navigate('MyProfile')}

@@ -183,68 +183,6 @@ const getAvailableMedicines = asyncHandler(async (req, res) => {
   });
 });
 
-const addScheduleSlot = asyncHandler(async (req, res, next) => {
-  const { scheduleDate, startTime, endTime } = req.body;
-
-  if (!scheduleDate || !startTime) {
-    const error = new Error('scheduleDate and startTime are required.');
-    error.statusCode = 400;
-    return next(error);
-  }
-
-  const existingSlot = await DoctorSchedule.findOne({
-    doctor: req.user._id,
-    scheduleDate,
-    startTime,
-  });
-
-  if (existingSlot) {
-    const error = new Error('Schedule slot already exists for this date and time.');
-    error.statusCode = 409;
-    return next(error);
-  }
-
-  const schedule = await DoctorSchedule.create({
-    doctor: req.user._id,
-    scheduleDate,
-    startTime,
-    endTime,
-    status: 'Available',
-  });
-
-  res.status(201).json({
-    success: true,
-    message: 'Schedule slot added successfully.',
-    schedule,
-  });
-});
-
-const deleteScheduleSlot = asyncHandler(async (req, res, next) => {
-  const schedule = await DoctorSchedule.findOne({
-    _id: req.params.id,
-    doctor: req.user._id,
-  });
-
-  if (!schedule) {
-    const error = new Error('Schedule slot not found.');
-    error.statusCode = 404;
-    return next(error);
-  }
-
-  if (schedule.status !== 'Available') {
-    const error = new Error('Only available schedule slots can be deleted.');
-    error.statusCode = 400;
-    return next(error);
-  }
-
-  await schedule.deleteOne();
-
-  res.status(200).json({
-    success: true,
-    message: 'Schedule slot deleted successfully.',
-  });
-});
-
 const createPrescription = asyncHandler(async (req, res, next) => {
   const { appointmentId, appointmentID, medicines, diagnosis, notes, attachments } = req.body;
   const appointmentRef = appointmentId || appointmentID;
@@ -388,8 +326,6 @@ export {
   completeAppointment,
   getMySchedule,
   getAvailableMedicines,
-  addScheduleSlot,
-  deleteScheduleSlot,
   createPrescription,
   uploadProfileImage,
 };

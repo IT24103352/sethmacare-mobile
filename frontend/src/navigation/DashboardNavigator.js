@@ -17,6 +17,7 @@ import ManagePrescriptions from '../screens/doctor/ManagePrescriptions';
 import CreatePrescription from '../screens/doctor/CreatePrescription';
 import ReceptionistDashboard from '../screens/receptionist/ReceptionistDashboard';
 import ManageAppointmentsScreen from '../screens/receptionist/ManageAppointmentsScreen';
+import ManageSchedulesScreen from '../screens/receptionist/ManageSchedulesScreen';
 import AccountantDashboard from '../screens/accountant/AccountantDashboard';
 import ManagePaymentsScreen from '../screens/accountant/ManagePaymentsScreen';
 import ManageSalariesScreen from '../screens/accountant/ManageSalariesScreen';
@@ -70,6 +71,7 @@ const DashboardNavigator = () => {
           <>
             <Stack.Screen name="ReceptionistHome" component={ReceptionistDashboard} options={{ title: 'Receptionist Dashboard' }} />
             <Stack.Screen name="ManageAppointments" component={ManageAppointmentsScreen} options={{ title: 'Manage Appointments' }} />
+            <Stack.Screen name="ManageSchedules" component={ManageSchedulesScreen} options={{ title: 'Manage Schedules' }} />
           </>
         );
       case 'Accountant':

@@ -7,8 +7,6 @@ import {
   completeAppointment,
   getMySchedule,
   getAvailableMedicines,
-  addScheduleSlot,
-  deleteScheduleSlot,
   createPrescription,
   uploadProfileImage,
 } from '../controllers/doctorController.js';
@@ -27,10 +25,6 @@ router.patch('/appointments/:id/complete', completeAppointment);
 router.get('/medicines', getAvailableMedicines);
 router.get('/schedules', getMySchedule);
 router.get('/schedule', getMySchedule);
-router.post('/schedules', addScheduleSlot);
-router.post('/schedule', addScheduleSlot);
-router.delete('/schedules/:id', deleteScheduleSlot);
-router.delete('/schedule/:id', deleteScheduleSlot);
 router.get('/prescriptions', getMyPrescriptions);
 router.post('/prescriptions', createPrescription);
 router.post('/profile-image', upload.single('image'), uploadProfileImage);
