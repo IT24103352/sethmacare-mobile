@@ -115,11 +115,17 @@ const ManagePaymentsScreen = () => {
       const appointmentCode = payment.appointment?.appointmentCode?.toLowerCase() || '';
       const patientName = payment.patient?.username?.toLowerCase() || '';
       const paymentMethod = payment.paymentMethod?.toLowerCase() || '';
+      const cardHolderName = payment.paymentDetails?.cardHolderName?.toLowerCase() || '';
+      const provider = payment.paymentDetails?.provider?.toLowerCase() || '';
+      const contactInfo = payment.paymentDetails?.contactInfo?.toLowerCase() || '';
       return (
         paymentCode.includes(term) ||
         appointmentCode.includes(term) ||
         patientName.includes(term) ||
-        paymentMethod.includes(term)
+        paymentMethod.includes(term) ||
+        cardHolderName.includes(term) ||
+        provider.includes(term) ||
+        contactInfo.includes(term)
       );
     });
   }, [payments, search]);
@@ -281,6 +287,27 @@ const ManagePaymentsScreen = () => {
           <DetailRow styles={styles} label="Payment Date" value={formatDate(paymentTimestamp)} />
           <DetailRow styles={styles} label="Payment Time" value={formatTime(paymentTimestamp)} />
           <DetailRow styles={styles} label="Payment Method" value={item.paymentMethod} />
+          {item.paymentMethod === 'Card' ? (
+            <DetailRow
+              styles={styles}
+              label="Cardholder"
+              value={item.paymentDetails?.cardHolderName}
+            />
+          ) : null}
+          {item.paymentMethod === 'Online' ? (
+            <>
+              <DetailRow
+                styles={styles}
+                label="Provider"
+                value={item.paymentDetails?.provider}
+              />
+              <DetailRow
+                styles={styles}
+                label="Account"
+                value={item.paymentDetails?.contactInfo}
+              />
+            </>
+          ) : null}
           {item.rejectedReason ? (
             <View style={styles.rejectionNote}>
               <Text style={styles.rejectionLabel}>Rejection Note</Text>

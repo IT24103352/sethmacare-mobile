@@ -4,6 +4,13 @@ import InputField from './InputField';
 import colors from '../theme/colors';
 
 const onlineProviders = ['Google Pay', 'Apple Pay', 'PayPal'];
+const CARD_NUMBER_REGEX = /^\d{16}$/;
+const CVV_REGEX = /^\d{3}$/;
+const EXPIRY_DATE_REGEX = /^(0[1-9]|1[0-2])\/\d{2}$/;
+const EXPIRY_FORMAT_REGEX = /^\d{2}\/\d{2}$/;
+const CARD_NAME_REGEX = /^[a-zA-Z\s]+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_REGEX = /^\d{10}$/;
 
 const emptyCardDetails = {
   cardNumber: '',
@@ -14,7 +21,7 @@ const emptyCardDetails = {
 
 const emptyOnlineDetails = {
   provider: 'Google Pay',
-  account: '',
+  contactInfo: '',
 };
 
 const formatExpiryDate = (value) => {
@@ -27,33 +34,96 @@ const formatExpiryDate = (value) => {
   return `${digits.slice(0, 2)}/${digits.slice(2)}`;
 };
 
-const isCardPaymentValid = (cardDetails) => {
+const getOnlineContactInfo = (onlineDetails) =>
+  (onlineDetails.contactInfo ?? onlineDetails.account ?? '').trim();
+
+const getCardPaymentValidationError = (cardDetails) => {
   const cardNumber = cardDetails.cardNumber.replace(/\D/g, '');
   const expiryDate = cardDetails.expiryDate.trim();
   const cvv = cardDetails.cvv.replace(/\D/g, '');
   const nameOnCard = cardDetails.nameOnCard.trim();
 
-  return (
-    cardNumber.length === 16 &&
-    /^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate) &&
-    cvv.length === 3 &&
-    Boolean(nameOnCard)
-  );
+  if (!CARD_NUMBER_REGEX.test(cardNumber)) {
+    return 'Card number must be exactly 16 digits.';
+  }
+
+  if (!expiryDate) {
+    return 'Expiry date is required.';
+  }
+
+  if (!EXPIRY_FORMAT_REGEX.test(expiryDate)) {
+    return 'Expiry date must use MM/YY format.';
+  }
+
+  if (!EXPIRY_DATE_REGEX.test(expiryDate)) {
+    return 'Invalid expiry month. Use 01 to 12.';
+  }
+
+  if (!CVV_REGEX.test(cvv)) {
+    return 'CVV must be exactly 3 digits.';
+  }
+
+  if (!nameOnCard) {
+    return 'Name on card is required.';
+  }
+
+  if (!CARD_NAME_REGEX.test(nameOnCard)) {
+    return 'Name cannot contain numbers or symbols.';
+  }
+
+  return '';
 };
 
-const isOnlinePaymentValid = (onlineDetails) =>
-  Boolean(onlineDetails.provider) && Boolean(onlineDetails.account.trim());
+const getOnlinePaymentValidationError = (onlineDetails) => {
+  const provider = onlineDetails.provider?.trim();
+  const contactInfo = getOnlineContactInfo(onlineDetails);
 
-const isMockPaymentValid = (paymentMethod, cardDetails, onlineDetails) => {
+  if (!provider) {
+    return 'Select an online payment provider.';
+  }
+
+  if (!contactInfo) {
+    return 'Enter the email or 10-digit phone number linked to your provider.';
+  }
+
+  if (!EMAIL_REGEX.test(contactInfo) && !PHONE_REGEX.test(contactInfo)) {
+    return 'Enter a valid email address or 10-digit phone number.';
+  }
+
+  return '';
+};
+
+const getMockPaymentValidationError = (paymentMethod, cardDetails, onlineDetails) => {
   if (paymentMethod === 'Card') {
-    return isCardPaymentValid(cardDetails);
+    return getCardPaymentValidationError(cardDetails);
   }
 
   if (paymentMethod === 'Online') {
-    return isOnlinePaymentValid(onlineDetails);
+    return getOnlinePaymentValidationError(onlineDetails);
   }
 
-  return true;
+  return '';
+};
+
+const isMockPaymentValid = (paymentMethod, cardDetails, onlineDetails) => {
+  return !getMockPaymentValidationError(paymentMethod, cardDetails, onlineDetails);
+};
+
+const buildMockPaymentDetails = (paymentMethod, cardDetails, onlineDetails) => {
+  if (paymentMethod === 'Card') {
+    return {
+      cardHolderName: cardDetails.nameOnCard.trim().replace(/\s+/g, ' '),
+    };
+  }
+
+  if (paymentMethod === 'Online') {
+    return {
+      provider: onlineDetails.provider?.trim() || '',
+      contactInfo: getOnlineContactInfo(onlineDetails),
+    };
+  }
+
+  return {};
 };
 
 const MockPaymentForm = ({
@@ -101,6 +171,8 @@ const MockPaymentForm = ({
   }
 
   if (paymentMethod === 'Online') {
+    const validationError = getOnlinePaymentValidationError(onlineDetails);
+
     return (
       <View style={styles.formPanel}>
         <Text style={styles.formTitle}>Online Payment Provider</Text>
@@ -125,17 +197,19 @@ const MockPaymentForm = ({
         <Text style={styles.inputLabel}>Email or Phone Number</Text>
         <InputField
           placeholder="Email or phone linked to provider"
-          value={onlineDetails.account}
-          onChangeText={(value) => updateOnlineDetails('account', value)}
+          value={getOnlineContactInfo(onlineDetails)}
+          onChangeText={(value) => updateOnlineDetails('contactInfo', value)}
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        {!isOnlinePaymentValid(onlineDetails) ? (
-          <Text style={styles.validationText}>Select a provider and enter an email or phone number.</Text>
+        {validationError ? (
+          <Text style={styles.validationText}>{validationError}</Text>
         ) : null}
       </View>
     );
   }
+
+  const validationError = getCardPaymentValidationError(cardDetails);
 
   return (
     <View style={styles.formPanel}>
@@ -178,10 +252,8 @@ const MockPaymentForm = ({
         onChangeText={(value) => updateCardDetails('nameOnCard', value)}
         autoCapitalize="words"
       />
-      {!isCardPaymentValid(cardDetails) ? (
-        <Text style={styles.validationText}>
-          Enter 16 card digits, MM/YY expiry, 3 digit CVV, and cardholder name.
-        </Text>
+      {validationError ? (
+        <Text style={styles.validationText}>{validationError}</Text>
       ) : null}
     </View>
   );
@@ -268,8 +340,10 @@ const styles = StyleSheet.create({
 });
 
 export {
+  buildMockPaymentDetails,
   emptyCardDetails,
   emptyOnlineDetails,
+  getMockPaymentValidationError,
   isMockPaymentValid,
 };
 

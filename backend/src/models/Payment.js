@@ -32,6 +32,27 @@ const imageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const paymentDetailsSchema = new mongoose.Schema(
+  {
+    cardHolderName: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
+    provider: {
+      type: String,
+      trim: true,
+      maxlength: 80,
+    },
+    contactInfo: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
+  },
+  { _id: false }
+);
+
 const paymentSchema = new mongoose.Schema(
   {
     paymentCode: {
@@ -74,6 +95,7 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       enum: ['Card', 'Cash', 'Online'],
     },
+    paymentDetails: paymentDetailsSchema,
     status: {
       type: String,
       enum: ['Pending', 'Confirmed', 'Rejected', 'Refunded'],

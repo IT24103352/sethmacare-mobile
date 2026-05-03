@@ -14,9 +14,10 @@ import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import Loading from '../../components/Loading';
 import MockPaymentForm, {
+  buildMockPaymentDetails,
   emptyCardDetails,
   emptyOnlineDetails,
-  isMockPaymentValid,
+  getMockPaymentValidationError,
 } from '../../components/MockPaymentForm';
 import colors from '../../theme/colors';
 
@@ -102,8 +103,14 @@ const BookAppointmentScreen = ({ navigation, route }) => {
   };
 
   const handleBooking = async () => {
-    if (!isMockPaymentValid(paymentMethod, cardDetails, onlineDetails)) {
-      setError('Complete the selected payment method details before booking.');
+    const validationError = getMockPaymentValidationError(
+      paymentMethod,
+      cardDetails,
+      onlineDetails
+    );
+
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
@@ -125,6 +132,7 @@ const BookAppointmentScreen = ({ navigation, route }) => {
         appointmentId: appointment._id,
         amount: appointment.consultationFee ?? consultationFee,
         paymentMethod,
+        paymentDetails: buildMockPaymentDetails(paymentMethod, cardDetails, onlineDetails),
       });
 
       setBookingSummary({
@@ -167,8 +175,6 @@ const BookAppointmentScreen = ({ navigation, route }) => {
   if (isLoading) {
     return <Loading />;
   }
-
-  const isPaymentReady = isMockPaymentValid(paymentMethod, cardDetails, onlineDetails);
 
   return (
     <View style={styles.container}>
@@ -230,6 +236,8 @@ const BookAppointmentScreen = ({ navigation, route }) => {
               <Text style={styles.summaryAmount}>Rs. {Number(consultationFee || 0).toLocaleString()}</Text>
             </View>
 
+            <ErrorMessage message={error} />
+
             <Text style={styles.paymentTitle}>Select Payment Method</Text>
             <View style={styles.paymentOptions}>
               {paymentMethods.map((method) => {
@@ -270,7 +278,7 @@ const BookAppointmentScreen = ({ navigation, route }) => {
                 title="Complete Booking"
                 onPress={handleBooking}
                 loading={isSubmitting}
-                disabled={!isPaymentReady}
+                disabled={isSubmitting}
                 style={styles.modalActionButton}
               />
             </View>

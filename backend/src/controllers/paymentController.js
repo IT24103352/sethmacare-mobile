@@ -21,12 +21,38 @@ const getNextPaymentCode = async () => {
   return `${counter.prefix}${String(counter.seq).padStart(3, '0')}`;
 };
 
+const paymentMethods = ['Card', 'Cash', 'Online'];
+
+const normalizePaymentDetails = (paymentMethod, paymentDetails = {}) => {
+  const details =
+    paymentDetails && typeof paymentDetails === 'object' && !Array.isArray(paymentDetails)
+      ? paymentDetails
+      : {};
+
+  if (paymentMethod === 'Card') {
+    return {
+      cardHolderName:
+        typeof details.cardHolderName === 'string' ? details.cardHolderName.trim() : '',
+    };
+  }
+
+  if (paymentMethod === 'Online') {
+    return {
+      provider: typeof details.provider === 'string' ? details.provider.trim() : '',
+      contactInfo: typeof details.contactInfo === 'string' ? details.contactInfo.trim() : '',
+    };
+  }
+
+  return undefined;
+};
+
 const createPayment = asyncHandler(async (req, res, next) => {
   const {
     appointmentId,
     appointmentID,
     amount,
     paymentMethod = 'Cash',
+    paymentDetails,
     transactionRef,
     receiptImage,
   } = req.body;
@@ -34,6 +60,12 @@ const createPayment = asyncHandler(async (req, res, next) => {
 
   if (!appointmentRef || amount === undefined) {
     const error = new Error('appointmentId and amount are required.');
+    error.statusCode = 400;
+    return next(error);
+  }
+
+  if (!paymentMethods.includes(paymentMethod)) {
+    const error = new Error('Payment method must be Card, Cash, or Online.');
     error.statusCode = 400;
     return next(error);
   }
@@ -74,6 +106,7 @@ const createPayment = asyncHandler(async (req, res, next) => {
     patient: appointment.patient,
     amount,
     paymentMethod,
+    paymentDetails: normalizePaymentDetails(paymentMethod, paymentDetails),
     transactionRef,
     receiptImage,
     status: 'Pending',
