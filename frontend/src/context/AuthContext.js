@@ -19,20 +19,14 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   const login = useCallback(async (credentials) => {
-    setIsLoading(true);
+    const response = await client.post('/auth/login', credentials);
+    const { token: apiToken, user: apiUser } = response.data;
 
-    try {
-      const response = await client.post('/auth/login', credentials);
-      const { token: apiToken, user: apiUser } = response.data;
+    await SecureStore.setItemAsync(TOKEN_KEY, apiToken);
+    setToken(apiToken);
+    setUser(apiUser);
 
-      await SecureStore.setItemAsync(TOKEN_KEY, apiToken);
-      setToken(apiToken);
-      setUser(apiUser);
-
-      return response.data;
-    } finally {
-      setIsLoading(false);
-    }
+    return response.data;
   }, []);
 
   const register = useCallback(async (payload) => {

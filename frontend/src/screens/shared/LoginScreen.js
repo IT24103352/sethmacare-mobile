@@ -11,11 +11,9 @@ import {
 import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import InputField from '../../components/InputField';
+import getApiErrorMessage from '../../api/errors';
 import colors from '../../theme/colors';
 import { useAuth } from '../../context/AuthContext';
-
-const getErrorMessage = (error) =>
-  error?.response?.data?.message || error?.message || 'Something went wrong. Please try again.';
 
 const LoginScreen = ({ navigation, route }) => {
   const { login } = useAuth();
@@ -42,7 +40,7 @@ const LoginScreen = ({ navigation, route }) => {
         password,
       });
     } catch (loginError) {
-      setError(getErrorMessage(loginError));
+      setError(getApiErrorMessage(loginError, 'Login failed. Please try again.'));
     } finally {
       setIsSubmitting(false);
     }

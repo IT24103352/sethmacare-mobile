@@ -1,13 +1,19 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-// We changed this line to use your computer's exact Wi-Fi IP address
-// so your physical phone can talk to your computer!
-const baseURL = "http://192.168.8.100:5000/api";
+const DEFAULT_API_BASE_URL = "http://192.168.8.101:5000/api";
+const API_TIMEOUT_MS = 60000;
+
+const configuredBaseURL =
+  typeof process !== "undefined"
+    ? process.env?.EXPO_PUBLIC_API_BASE_URL
+    : undefined;
+
+const baseURL = configuredBaseURL || DEFAULT_API_BASE_URL;
 
 const client = axios.create({
   baseURL,
-  timeout: 15000,
+  timeout: API_TIMEOUT_MS,
   headers: {
     "Content-Type": "application/json",
   },
