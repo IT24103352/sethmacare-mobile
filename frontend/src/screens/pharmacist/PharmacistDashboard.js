@@ -110,7 +110,7 @@ const PharmacistDashboard = ({ navigation }) => {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Quick Actions</Text>
-        <Text style={styles.panelText}>Open the prescription queue or maintain the medicine stock register.</Text>
+        <Text style={styles.panelText}>Open the prescription queue, maintain stock, or contact support.</Text>
 
         <CustomButton
           title="Manage Prescriptions"
@@ -121,6 +121,12 @@ const PharmacistDashboard = ({ navigation }) => {
           title="Medicine Stock"
           type="secondary"
           onPress={() => navigation.navigate('MedicineStock')}
+          style={styles.button}
+        />
+        <CustomButton
+          title="My Tickets"
+          type="secondary"
+          onPress={() => navigation.navigate('MyTickets')}
           style={styles.button}
         />
         <CustomButton

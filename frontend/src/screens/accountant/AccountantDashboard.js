@@ -160,7 +160,7 @@ const AccountantDashboard = ({ navigation }) => {
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Finance Actions</Text>
         <Text style={styles.panelText}>
-          Verify pending payments, adjust salary settings, and keep audit records current.
+          Verify pending payments, adjust salary settings, or contact support.
         </Text>
 
         <CustomButton
@@ -172,6 +172,12 @@ const AccountantDashboard = ({ navigation }) => {
           title="Manage Salaries"
           type="secondary"
           onPress={() => navigation.navigate('ManageSalaries')}
+          style={styles.button}
+        />
+        <CustomButton
+          title="My Tickets"
+          type="secondary"
+          onPress={() => navigation.navigate('MyTickets')}
           style={styles.button}
         />
         <CustomButton

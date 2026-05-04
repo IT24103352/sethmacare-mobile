@@ -113,7 +113,7 @@ const DoctorDashboard = ({ navigation }) => {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Quick Actions</Text>
-        <Text style={styles.panelText}>Review bookings, maintain availability, or update your profile.</Text>
+        <Text style={styles.panelText}>Review bookings, maintain availability, or contact support.</Text>
 
         <CustomButton
           title="My Appointments"
@@ -130,6 +130,12 @@ const DoctorDashboard = ({ navigation }) => {
           title="Manage Prescriptions"
           type="secondary"
           onPress={() => navigation.navigate('ManagePrescriptions')}
+          style={styles.button}
+        />
+        <CustomButton
+          title="My Tickets"
+          type="secondary"
+          onPress={() => navigation.navigate('MyTickets')}
           style={styles.button}
         />
         <CustomButton

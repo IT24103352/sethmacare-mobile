@@ -110,7 +110,7 @@ const AdminDashboard = ({ navigation }) => {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Quick Actions</Text>
-        <Text style={styles.panelText}>Open the user registry or update your profile details.</Text>
+        <Text style={styles.panelText}>Open the user registry, publish updates, or respond to support tickets.</Text>
 
         <CustomButton
           title="Manage Users"
@@ -121,6 +121,18 @@ const AdminDashboard = ({ navigation }) => {
           title="Manage Announcements"
           type="secondary"
           onPress={() => navigation.navigate('ManageAnnouncements')}
+          style={styles.button}
+        />
+        <CustomButton
+          title="Manage Tickets"
+          type="secondary"
+          onPress={() => navigation.navigate('ManageTickets')}
+          style={styles.button}
+        />
+        <CustomButton
+          title="My Tickets"
+          type="secondary"
+          onPress={() => navigation.navigate('MyTickets')}
           style={styles.button}
         />
         <CustomButton

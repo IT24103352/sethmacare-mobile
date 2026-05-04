@@ -4,6 +4,7 @@ import AdminDashboard from '../screens/admin/AdminDashboard';
 import ManageUsersScreen from '../screens/admin/ManageUsersScreen';
 import AdminAddUser from '../screens/admin/AdminAddUser';
 import ManageAnnouncementsScreen from '../screens/admin/ManageAnnouncementsScreen';
+import ManageTicketsScreen from '../screens/admin/ManageTicketsScreen';
 import PatientDashboard from '../screens/patient/PatientDashboard';
 import DoctorListScreen from '../screens/patient/DoctorListScreen';
 import BookAppointmentScreen from '../screens/patient/BookAppointmentScreen';
@@ -26,6 +27,7 @@ import ManagePharmacistPrescriptionsScreen from '../screens/pharmacist/ManagePre
 import MedicineStockScreen from '../screens/pharmacist/MedicineStockScreen';
 import AddMedicineScreen from '../screens/pharmacist/AddMedicineScreen';
 import MyProfile from '../screens/shared/MyProfile.js';
+import MyTicketsScreen from '../screens/shared/MyTicketsScreen';
 import { useAuth } from '../context/AuthContext';
 import colors from '../theme/colors';
 
@@ -43,6 +45,7 @@ const DashboardNavigator = () => {
             <Stack.Screen name="ManageUsers" component={ManageUsersScreen} options={{ title: 'Manage Users' }} />
             <Stack.Screen name="AdminAddUser" component={AdminAddUser} options={{ title: 'Add User' }} />
             <Stack.Screen name="ManageAnnouncements" component={ManageAnnouncementsScreen} options={{ title: 'Manage Announcements' }} />
+            <Stack.Screen name="ManageTickets" component={ManageTicketsScreen} options={{ title: 'Manage Tickets' }} />
           </>
         );
       case 'Patient':
@@ -113,6 +116,7 @@ const DashboardNavigator = () => {
     >
       {renderRoleDashboard()}
       <Stack.Screen name="MyProfile" component={MyProfile} options={{ title: 'My Profile' }} />
+      <Stack.Screen name="MyTickets" component={MyTicketsScreen} options={{ title: 'My Tickets' }} />
     </Stack.Navigator>
   );
 };

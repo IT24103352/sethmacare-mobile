@@ -113,7 +113,7 @@ const PatientDashboard = ({ navigation }) => {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Quick Actions</Text>
-        <Text style={styles.panelText}>Book a doctor, review appointments, or update your details.</Text>
+        <Text style={styles.panelText}>Book a doctor, review appointments, or contact support.</Text>
 
         <CustomButton
           title="Book Appointment"
@@ -136,6 +136,12 @@ const PatientDashboard = ({ navigation }) => {
           title="My Payments"
           type="secondary"
           onPress={() => navigation.navigate('MyPayments')}
+          style={styles.button}
+        />
+        <CustomButton
+          title="My Tickets"
+          type="secondary"
+          onPress={() => navigation.navigate('MyTickets')}
           style={styles.button}
         />
         <CustomButton

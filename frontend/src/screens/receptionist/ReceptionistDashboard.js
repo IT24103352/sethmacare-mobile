@@ -110,7 +110,7 @@ const ReceptionistDashboard = ({ navigation }) => {
 
       <View style={styles.panel}>
         <Text style={styles.panelTitle}>Quick Actions</Text>
-        <Text style={styles.panelText}>Review paid appointments and finalize confirmations.</Text>
+        <Text style={styles.panelText}>Review paid appointments, finalize confirmations, or contact support.</Text>
 
         <CustomButton
           title="Manage Appointments"
@@ -121,6 +121,12 @@ const ReceptionistDashboard = ({ navigation }) => {
           title="Manage Schedules"
           type="secondary"
           onPress={() => navigation.navigate('ManageSchedules')}
+          style={styles.button}
+        />
+        <CustomButton
+          title="My Tickets"
+          type="secondary"
+          onPress={() => navigation.navigate('MyTickets')}
           style={styles.button}
         />
         <CustomButton

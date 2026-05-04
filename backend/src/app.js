@@ -14,6 +14,7 @@ import accountantRoutes from './routes/accountantRoutes.js';
 import salaryRoutes from './routes/salaryRoutes.js';
 import pharmacistRoutes from './routes/pharmacistRoutes.js';
 import announcementRoutes from './routes/announcementRoutes.js';
+import ticketRoutes from './routes/ticketRoutes.js';
 import errorHandler from './middleware/errorMiddleware.js';
 
 const app = express();
@@ -73,6 +74,7 @@ app.use('/api/accountant', accountantRoutes);
 app.use('/api/salaries', salaryRoutes);
 app.use('/api/pharmacist', pharmacistRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/tickets', ticketRoutes);
 
 // Any unmatched endpoint reaches this middleware before the centralized error handler.
 app.use((req, res, next) => {
