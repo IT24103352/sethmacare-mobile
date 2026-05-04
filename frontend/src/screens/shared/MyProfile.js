@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 import client from '../../api/client';
 import CustomButton from '../../components/CustomButton';
@@ -21,8 +22,8 @@ import { useTheme } from '../../context/ThemeContext';
 
 const genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
-const getErrorMessage = (error) =>
-  error?.response?.data?.message || error?.message || 'Unable to update profile.';
+const getErrorMessage = (error, fallbackMessage = 'Unable to update profile.') =>
+  error?.response?.data?.message || error?.message || fallbackMessage;
 
 const getSalaryErrorMessage = (error) =>
   error?.response?.data?.message || error?.message || 'Unable to load salary history.';
@@ -106,6 +107,48 @@ const LockedField = ({ label, value, sx }) => (
   </View>
 );
 
+const PasswordField = ({
+  label,
+  value,
+  onChangeText,
+  visible,
+  onToggleVisibility,
+  placeholder,
+  sx,
+  iconColor,
+  disabled = false,
+  returnKeyType = 'next',
+  onSubmitEditing,
+}) => (
+  <>
+    <Text style={sx.inputLabel}>{label}</Text>
+    <View style={sx.passwordField}>
+      <InputField
+        placeholder={placeholder}
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={!visible}
+        editable={!disabled}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
+        inputStyle={sx.passwordInput}
+      />
+      <TouchableOpacity
+        activeOpacity={0.72}
+        accessibilityLabel={
+          visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`
+        }
+        accessibilityRole="button"
+        disabled={disabled}
+        onPress={onToggleVisibility}
+        style={[sx.passwordToggle, disabled && sx.disabledPasswordToggle]}
+      >
+        <Ionicons name={visible ? 'eye-off' : 'eye'} size={22} color={iconColor} />
+      </TouchableOpacity>
+    </View>
+  </>
+);
+
 const SalaryRow = ({ salary, sx }) => (
   <View style={sx.salaryRow}>
     <View style={sx.salaryMain}>
@@ -146,6 +189,17 @@ const MyProfile = () => {
   const [isLoadingSalaries, setIsLoadingSalaries] = useState(false);
   const [salaryError, setSalaryError] = useState('');
   const [error, setError] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
+  const [passwordFeedback, setPasswordFeedback] = useState({ message: '', type: 'error' });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+  });
+  const [passwordVisibility, setPasswordVisibility] = useState({
+    currentPassword: false,
+    newPassword: false,
+  });
   const [form, setForm] = useState({
     phoneNumber: '',
     nicNumber: '',
@@ -223,6 +277,20 @@ const MyProfile = () => {
     }));
   };
 
+  const updatePasswordField = (field, value) => {
+    setPasswordForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const togglePasswordVisibility = (field) => {
+    setPasswordVisibility((current) => ({
+      ...current,
+      [field]: !current[field],
+    }));
+  };
+
   const resetForm = () => {
     setForm({
       phoneNumber: user?.phoneNumber || '',
@@ -238,11 +306,33 @@ const MyProfile = () => {
     });
   };
 
+  const resetPasswordForm = () => {
+    setPasswordForm({
+      currentPassword: '',
+      newPassword: '',
+    });
+    setPasswordVisibility({
+      currentPassword: false,
+      newPassword: false,
+    });
+  };
+
   const handleCancel = () => {
     setError('');
     setIsEditing(false);
     setIsDobPickerVisible(false);
     resetForm();
+  };
+
+  const handleStartPasswordChange = () => {
+    setPasswordFeedback({ message: '', type: 'error' });
+    setIsChangingPassword(true);
+  };
+
+  const handleCancelPasswordChange = () => {
+    setPasswordFeedback({ message: '', type: 'error' });
+    setIsChangingPassword(false);
+    resetPasswordForm();
   };
 
   const handleDateChange = (event, selectedDate) => {
@@ -312,6 +402,49 @@ const MyProfile = () => {
       setError(getErrorMessage(saveError));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitPasswordChange = async () => {
+    setPasswordFeedback({ message: '', type: 'error' });
+
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      setPasswordFeedback({
+        message: 'Current password and new password are required.',
+        type: 'error',
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordFeedback({
+        message: 'New password must be at least 6 characters long.',
+        type: 'error',
+      });
+      return;
+    }
+
+    setIsPasswordSubmitting(true);
+
+    try {
+      const response = await client.patch('/auth/me/password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+
+      resetPasswordForm();
+      setIsChangingPassword(false);
+      setPasswordFeedback({
+        message: response.data?.message || 'Password updated successfully.',
+        type: 'success',
+      });
+    } catch (passwordError) {
+      setPasswordFeedback({
+        message: getErrorMessage(passwordError, 'Unable to update password.'),
+        type: 'error',
+      });
+    } finally {
+      setIsPasswordSubmitting(false);
     }
   };
 
@@ -599,6 +732,78 @@ const MyProfile = () => {
             </View>
           </View>
         )}
+
+        <View style={styles.securitySection}>
+          <View style={styles.securityHeader}>
+            <View style={styles.securityCopy}>
+              <Text style={styles.securityTitle}>Security</Text>
+              <Text style={styles.securityMeta}>Password</Text>
+            </View>
+
+            {!isChangingPassword ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleStartPasswordChange}
+                style={styles.changePasswordButton}
+              >
+                <Ionicons name="key-outline" size={17} color={colors.white} />
+                <Text style={styles.changePasswordButtonText}>Change</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <ErrorMessage
+            message={passwordFeedback.message}
+            type={passwordFeedback.type}
+            style={styles.passwordFeedback}
+          />
+
+          {isChangingPassword ? (
+            <View style={styles.passwordForm}>
+              <PasswordField
+                label="Current Password"
+                placeholder="Current password"
+                value={passwordForm.currentPassword}
+                onChangeText={(value) => updatePasswordField('currentPassword', value)}
+                visible={passwordVisibility.currentPassword}
+                onToggleVisibility={() => togglePasswordVisibility('currentPassword')}
+                sx={styles}
+                iconColor={colors.textMuted}
+                disabled={isPasswordSubmitting}
+              />
+
+              <PasswordField
+                label="New Password"
+                placeholder="New password"
+                value={passwordForm.newPassword}
+                onChangeText={(value) => updatePasswordField('newPassword', value)}
+                visible={passwordVisibility.newPassword}
+                onToggleVisibility={() => togglePasswordVisibility('newPassword')}
+                sx={styles}
+                iconColor={colors.textMuted}
+                disabled={isPasswordSubmitting}
+                returnKeyType="done"
+                onSubmitEditing={handleSubmitPasswordChange}
+              />
+
+              <View style={styles.formActions}>
+                <CustomButton
+                  title="Update Password"
+                  onPress={handleSubmitPasswordChange}
+                  loading={isPasswordSubmitting}
+                  style={styles.actionButton}
+                />
+                <CustomButton
+                  title="Cancel"
+                  type="secondary"
+                  onPress={handleCancelPasswordChange}
+                  disabled={isPasswordSubmitting}
+                  style={styles.actionButton}
+                />
+              </View>
+            </View>
+          ) : null}
+        </View>
 
         {isStaff ? (
           <View style={styles.salarySection}>
@@ -911,6 +1116,77 @@ const createStyles = (colors, isDark) => StyleSheet.create({
   },
   actionButton: {
     marginTop: 12,
+  },
+  securitySection: {
+    backgroundColor: colors.surfaceGlass,
+    borderColor: colors.border,
+    borderRadius: 22,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 16,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: isDark ? 0.22 : 0.1,
+    shadowRadius: 22,
+    elevation: 2,
+  },
+  securityHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  securityCopy: {
+    flex: 1,
+  },
+  securityTitle: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  securityMeta: {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  changePasswordButton: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+  },
+  changePasswordButtonText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  passwordFeedback: {
+    marginTop: 12,
+  },
+  passwordForm: {
+    marginTop: 14,
+  },
+  passwordField: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 48,
+  },
+  passwordToggle: {
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 2,
+    top: 0,
+    width: 48,
+  },
+  disabledPasswordToggle: {
+    opacity: 0.55,
   },
   salarySection: {
     backgroundColor: colors.surfaceGlass,

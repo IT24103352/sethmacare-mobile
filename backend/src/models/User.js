@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 
 // Stores Multer/cloud-upload metadata. The binary file itself stays outside MongoDB.
@@ -156,5 +157,13 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ role: 1, confirmed: 1 });
+
+userSchema.methods.matchPassword = function (enteredPassword) {
+  return bcrypt.compare(enteredPassword, this.passwordHash);
+};
+
+userSchema.methods.setPassword = async function (newPassword) {
+  this.passwordHash = await bcrypt.hash(newPassword, 10);
+};
 
 export default mongoose.model('User', userSchema);

@@ -334,7 +334,7 @@ const loginUser = async (req, res, next) => {
       return next(error);
     }
 
-    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+    const passwordMatches = await user.matchPassword(password);
 
     if (!passwordMatches) {
       const error = new Error('Invalid credentials.');
@@ -463,6 +463,56 @@ const updateMe = async (req, res, next) => {
   }
 };
 
+const updatePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      const error = new Error('Current password and new password are required.');
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+      const error = new Error('Current password and new password must be strings.');
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    if (newPassword.length < 6) {
+      const error = new Error('New password must be at least 6 characters long.');
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    const user = await User.findById(req.user._id).select('+passwordHash');
+
+    if (!user) {
+      const error = new Error('User not found.');
+      error.statusCode = 404;
+      return next(error);
+    }
+
+    const passwordMatches = await user.matchPassword(currentPassword);
+
+    if (!passwordMatches) {
+      const error = new Error('Current password is incorrect.');
+      error.statusCode = 401;
+      return next(error);
+    }
+
+    await user.setPassword(newPassword);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully.',
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const getAllUsers = async (req, res, next) => {
   try {
     const users = await User.find().sort({ createdAt: -1 });
@@ -541,6 +591,7 @@ export {
   loginUser,
   getMe,
   updateMe,
+  updatePassword,
   getAllUsers,
   getPendingUsers,
   confirmUser,

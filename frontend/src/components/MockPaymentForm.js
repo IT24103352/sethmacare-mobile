@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import InputField from './InputField';
 import colors from '../theme/colors';
 
@@ -133,6 +134,8 @@ const MockPaymentForm = ({
   onCardDetailsChange,
   onOnlineDetailsChange,
 }) => {
+  const [showCvv, setShowCvv] = useState(false);
+
   const updateOnlineDetails = (field, value) => {
     onOnlineDetailsChange({
       ...onlineDetails,
@@ -224,19 +227,35 @@ const MockPaymentForm = ({
         </View>
         <View style={styles.splitItem}>
           <Text style={styles.inputLabel}>CVV</Text>
-          <InputField
-            placeholder="3 digits"
-            value={cardDetails.cvv}
-            keyboardType="numeric"
-            maxLength={3}
-            secureTextEntry
-            onChangeText={(text) =>
-              onCardDetailsChange({
-                ...cardDetails,
-                cvv: text.replace(/\D/g, '').slice(0, 3),
-              })
-            }
-          />
+          <View style={styles.secureInputWrapper}>
+            <InputField
+              placeholder="3 digits"
+              value={cardDetails.cvv}
+              keyboardType="numeric"
+              maxLength={3}
+              secureTextEntry={!showCvv}
+              inputStyle={styles.secureInput}
+              onChangeText={(text) =>
+                onCardDetailsChange({
+                  ...cardDetails,
+                  cvv: text.replace(/\D/g, '').slice(0, 3),
+                })
+              }
+            />
+            <TouchableOpacity
+              activeOpacity={0.72}
+              accessibilityLabel={showCvv ? 'Hide CVV' : 'Show CVV'}
+              accessibilityRole="button"
+              onPress={() => setShowCvv((current) => !current)}
+              style={styles.secureToggle}
+            >
+              <Ionicons
+                name={showCvv ? 'eye-off' : 'eye'}
+                size={20}
+                color={colors.textMuted}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       <Text style={styles.inputLabel}>Name on Card</Text>
@@ -304,6 +323,21 @@ const styles = StyleSheet.create({
   },
   splitItem: {
     flex: 1,
+  },
+  secureInputWrapper: {
+    position: 'relative',
+  },
+  secureInput: {
+    paddingRight: 42,
+  },
+  secureToggle: {
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    width: 42,
   },
   providerRow: {
     flexDirection: 'row',

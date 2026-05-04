@@ -5,6 +5,7 @@ import {
   loginUser,
   getMe,
   updateMe,
+  updatePassword,
   getAllUsers,
   getPendingUsers,
   confirmUser,
@@ -18,6 +19,7 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.get('/me', protect, getMe);
 router.patch('/me', protect, updateMe);
+router.patch('/me/password', protect, updatePassword);
 
 router.post('/users/bulk', protect, authorizeRoles('Admin'), bulkCreateUsers);
 router.get('/users', protect, authorizeRoles('Admin'), getAllUsers);

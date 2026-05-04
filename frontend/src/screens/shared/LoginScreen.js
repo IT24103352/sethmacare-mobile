@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import CustomButton from '../../components/CustomButton';
 import ErrorMessage from '../../components/ErrorMessage';
 import InputField from '../../components/InputField';
@@ -19,6 +20,7 @@ const LoginScreen = ({ navigation, route }) => {
   const { login } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -72,14 +74,30 @@ const LoginScreen = ({ navigation, route }) => {
           returnKeyType="next"
         />
 
-        <InputField
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          returnKeyType="done"
-          onSubmitEditing={handleLogin}
-        />
+        <View style={styles.passwordField}>
+          <InputField
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!showPassword}
+            returnKeyType="done"
+            onSubmitEditing={handleLogin}
+            inputStyle={styles.passwordInput}
+          />
+          <TouchableOpacity
+            activeOpacity={0.72}
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+            accessibilityRole="button"
+            onPress={() => setShowPassword((current) => !current)}
+            style={styles.passwordToggle}
+          >
+            <Ionicons
+              name={showPassword ? 'eye-off' : 'eye'}
+              size={22}
+              color={colors.textMuted}
+            />
+          </TouchableOpacity>
+        </View>
 
         <CustomButton
           title="Login"
@@ -132,6 +150,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  passwordField: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 48,
+  },
+  passwordToggle: {
+    alignItems: 'center',
+    height: 48,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: 2,
+    top: 0,
+    width: 48,
   },
   linkButton: {
     alignItems: 'center',
