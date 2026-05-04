@@ -52,6 +52,12 @@ const addMedicine = asyncHandler(async (req, res, next) => {
     return next(error);
   }
 
+  if (stock <= 0 || reorderLevel <= 0 || price <= 0) {
+    const error = new Error('Stock, reorder level, and price must be greater than 0.');
+    error.statusCode = 400;
+    return next(error);
+  }
+
   const medicineCode = await getNextMedicineCode();
 
   const medicine = await Medicine.create({
@@ -111,6 +117,24 @@ const updateMedicine = asyncHandler(async (req, res, next) => {
       updates[field] = req.body[field];
     }
   });
+
+  if (updates.stock !== undefined && updates.stock <= 0) {
+    const error = new Error('Stock must be greater than 0.');
+    error.statusCode = 400;
+    return next(error);
+  }
+
+  if (updates.reorderLevel !== undefined && updates.reorderLevel <= 0) {
+    const error = new Error('Reorder level must be greater than 0.');
+    error.statusCode = 400;
+    return next(error);
+  }
+
+  if (updates.price !== undefined && updates.price <= 0) {
+    const error = new Error('Price must be greater than 0.');
+    error.statusCode = 400;
+    return next(error);
+  }
 
   const medicine = await Medicine.findByIdAndUpdate(req.params.id, updates, {
     new: true,

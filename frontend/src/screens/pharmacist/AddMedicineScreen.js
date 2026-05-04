@@ -25,6 +25,11 @@ const AddMedicineScreen = ({ navigation }) => {
       return;
     }
 
+    if (Number(stock) <= 0 || Number(reorderLevel) <= 0 || Number(price) <= 0) {
+      setError('Stock, reorder level, and price must be greater than 0.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
