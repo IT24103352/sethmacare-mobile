@@ -1,7 +1,7 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-const DEFAULT_API_BASE_URL = "http://192.168.8.101:5000/api";
+const DEFAULT_API_BASE_URL = "https://sethmacare-backend.onrender.com/api";
 const API_TIMEOUT_MS = 60000;
 
 const configuredBaseURL =
