@@ -4,23 +4,22 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import Announcement from '../models/Announcement.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { v2 as cloudinary } from 'cloudinary';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const announcementUploadSubfolder = 'announcements';
-const announcementUploadUrlPrefix = `/uploads/${announcementUploadSubfolder}`;
-const announcementUploadDir = path.resolve(
-  __dirname,
-  '..',
-  '..',
-  'uploads',
-  announcementUploadSubfolder
-);
+
 
 const allowedTargetAudiences = ['All', 'Patients', 'Doctors', 'Staff'];
 const allowedStatuses = ['Active', 'Expired'];
 
-const buildAnnouncementImageUrl = (file) => `${announcementUploadUrlPrefix}/${file.filename}`;
+const buildAnnouncementImageUrl = (file) => file.secure_url || file.url;
 
 const getPathname = (imageUrl) => {
   try {
@@ -35,43 +34,20 @@ const isInsideDirectory = (childPath, parentPath) => {
   return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
 };
 
-const safeDeleteAnnouncementImage = async (imageUrl) => {
+const deleteAnnouncementImage = async (imageUrl) => {
   if (!imageUrl) {
     return;
   }
 
-  const pathname = getPathname(imageUrl);
-  const expectedPrefix = `${announcementUploadUrlPrefix}/`;
-
-  if (!pathname.startsWith(expectedPrefix)) {
-    console.warn(`Skipped announcement image deletion outside expected URL prefix: ${imageUrl}`);
-    return;
-  }
-
-  let relativeFilename;
   try {
-    relativeFilename = decodeURIComponent(pathname.slice(expectedPrefix.length));
-  } catch {
-    console.warn(`Skipped announcement image deletion for malformed URL: ${imageUrl}`);
-    return;
-  }
-
-  const filePath = path.resolve(announcementUploadDir, relativeFilename);
-
-  if (!isInsideDirectory(filePath, announcementUploadDir)) {
-    console.warn(`Skipped unsafe announcement image deletion path: ${imageUrl}`);
-    return;
-  }
-
-  try {
-    await fs.unlink(filePath);
+    // Extract public_id from Cloudinary URL
+    // Example: https://res.cloudinary.com/.../sethmacare/announcements/xyz123
+    const parts = imageUrl.split('/');
+    const publicId = `sethmacare/announcements/${parts[parts.length - 1].split('.')[0]}`;
+    
+    await cloudinary.uploader.destroy(publicId);
   } catch (error) {
-    if (error.code === 'ENOENT') {
-      console.warn(`Announcement image already missing: ${filePath}`);
-      return;
-    }
-
-    console.warn(`Failed to delete announcement image ${filePath}: ${error.message}`);
+    console.warn(`Failed to delete announcement image: ${error.message}`);
   }
 };
 
