@@ -108,10 +108,10 @@ const MyPaymentsScreen = () => {
         <Detail label="Amount" value={`Rs. ${Number(item.amount || 0).toLocaleString()}`} />
         <Detail label="Method" value={item.paymentMethod} />
       </View>
-      
+
       {item.receiptImage?.url && (
-        <TouchableOpacity 
-          style={styles.viewSlipButton} 
+        <TouchableOpacity
+          style={styles.viewSlipButton}
           onPress={() => {
             setSelectedImageUrl(item.receiptImage.url);
             setIsImageModalVisible(true);
@@ -150,17 +150,17 @@ const MyPaymentsScreen = () => {
       >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>
-            <TouchableOpacity 
-              style={styles.closeButton} 
+            <TouchableOpacity
+              style={styles.closeButton}
               onPress={() => setIsImageModalVisible(false)}
             >
               <Text style={styles.closeButtonText}>Close</Text>
             </TouchableOpacity>
             {selectedImageUrl && (
-              <Image 
-                source={{ uri: selectedImageUrl }} 
-                style={styles.slipImage} 
-                resizeMode="contain" 
+              <Image
+                source={{ uri: selectedImageUrl }}
+                style={styles.slipImage}
+                resizeMode="contain"
               />
             )}
           </View>
