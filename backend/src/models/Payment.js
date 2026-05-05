@@ -120,6 +120,9 @@ const paymentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+
+
+
 paymentSchema.index({ appointment: 1 }, { unique: true });
 paymentSchema.index({ patient: 1, createdAt: -1 });
 paymentSchema.index({ status: 1, createdAt: -1 });

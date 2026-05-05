@@ -128,12 +128,40 @@ const BookAppointmentScreen = ({ navigation, route }) => {
 
       const appointment = appointmentResponse.data.appointment;
 
-      await client.post('/payments', {
-        appointmentId: appointment._id,
-        amount: appointment.consultationFee ?? consultationFee,
-        paymentMethod,
-        paymentDetails: buildMockPaymentDetails(paymentMethod, cardDetails, onlineDetails),
-      });
+      const paymentDetailsData = buildMockPaymentDetails(paymentMethod, cardDetails, onlineDetails);
+      
+      let payload;
+      let headers = {};
+
+      if (paymentMethod === 'Online' && paymentDetailsData.slipImage) {
+        payload = new FormData();
+        payload.append('appointmentId', appointment._id);
+        payload.append('amount', String(appointment.consultationFee ?? consultationFee));
+        payload.append('paymentMethod', paymentMethod);
+        
+        payload.append('provider', paymentDetailsData.provider);
+        payload.append('contactInfo', paymentDetailsData.contactInfo);
+        
+        const uriParts = paymentDetailsData.slipImage.split('.');
+        const fileType = uriParts[uriParts.length - 1];
+        
+        payload.append('slipImage', {
+          uri: paymentDetailsData.slipImage,
+          name: `payment_slip_${Date.now()}.${fileType}`,
+          type: `image/${fileType === 'jpg' ? 'jpeg' : fileType}`,
+        });
+        
+        headers = { 'Content-Type': 'multipart/form-data' };
+      } else {
+        payload = {
+          appointmentId: appointment._id,
+          amount: appointment.consultationFee ?? consultationFee,
+          paymentMethod,
+          paymentDetails: paymentDetailsData,
+        };
+      }
+
+      await client.post('/payments', payload, { headers });
 
       setBookingSummary({
         appointmentCode: appointment.appointmentCode,

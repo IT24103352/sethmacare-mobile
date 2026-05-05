@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 import InputField from './InputField';
 import colors from '../theme/colors';
 
@@ -23,6 +24,7 @@ const emptyCardDetails = {
 const emptyOnlineDetails = {
   provider: 'Google Pay',
   contactInfo: '',
+  slipImage: null,
 };
 
 const formatExpiryDate = (value) => {
@@ -91,6 +93,10 @@ const getOnlinePaymentValidationError = (onlineDetails) => {
     return 'Enter a valid email address or 10-digit phone number.';
   }
 
+  if (!onlineDetails.slipImage) {
+    return 'Please upload a payment slip image.';
+  }
+
   return '';
 };
 
@@ -121,6 +127,7 @@ const buildMockPaymentDetails = (paymentMethod, cardDetails, onlineDetails) => {
     return {
       provider: onlineDetails.provider?.trim() || '',
       contactInfo: getOnlineContactInfo(onlineDetails),
+      slipImage: onlineDetails.slipImage || null,
     };
   }
 
@@ -141,6 +148,18 @@ const MockPaymentForm = ({
       ...onlineDetails,
       [field]: value,
     });
+  };
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      updateOnlineDetails('slipImage', result.assets[0].uri);
+    }
   };
 
   if (paymentMethod === 'Cash') {
@@ -184,6 +203,19 @@ const MockPaymentForm = ({
           keyboardType="email-address"
           autoCapitalize="none"
         />
+
+        <Text style={[styles.inputLabel, { marginTop: 10 }]}>Payment Slip</Text>
+        <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+          <Ionicons name="cloud-upload-outline" size={24} color={colors.primary} />
+          <Text style={styles.imagePickerText}>
+            {onlineDetails.slipImage ? 'Change Image' : 'Upload Payment Slip'}
+          </Text>
+        </TouchableOpacity>
+        
+        {onlineDetails.slipImage ? (
+          <Image source={{ uri: onlineDetails.slipImage }} style={styles.slipImagePreview} />
+        ) : null}
+
         {validationError ? (
           <Text style={styles.validationText}>{validationError}</Text>
         ) : null}
@@ -369,6 +401,32 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 12,
     lineHeight: 18,
+    marginTop: 8,
+  },
+  imagePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    marginBottom: 10,
+  },
+  imagePickerText: {
+    marginLeft: 8,
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  slipImagePreview: {
+    width: '100%',
+    height: 150,
+    borderRadius: 8,
+    marginBottom: 10,
+    resizeMode: 'cover',
   },
 });
 

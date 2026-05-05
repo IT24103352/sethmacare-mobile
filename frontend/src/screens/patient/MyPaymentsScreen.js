@@ -5,6 +5,9 @@ import {
   StyleSheet,
   Text,
   View,
+  TouchableOpacity,
+  Modal,
+  Image,
 } from 'react-native';
 import client from '../../api/client';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -59,6 +62,8 @@ const MyPaymentsScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
+  const [selectedImageUrl, setSelectedImageUrl] = useState(null);
+  const [isImageModalVisible, setIsImageModalVisible] = useState(false);
 
   const fetchPayments = useCallback(async (showRefresh = false) => {
     if (showRefresh) {
@@ -103,6 +108,18 @@ const MyPaymentsScreen = () => {
         <Detail label="Amount" value={`Rs. ${Number(item.amount || 0).toLocaleString()}`} />
         <Detail label="Method" value={item.paymentMethod} />
       </View>
+      
+      {item.receiptImage?.url && (
+        <TouchableOpacity 
+          style={styles.viewSlipButton} 
+          onPress={() => {
+            setSelectedImageUrl(item.receiptImage.url);
+            setIsImageModalVisible(true);
+          }}
+        >
+          <Text style={styles.viewSlipText}>View Payment Slip</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -124,6 +141,31 @@ const MyPaymentsScreen = () => {
         }
         ListEmptyComponent={<Text style={styles.emptyText}>No payments found.</Text>}
       />
+
+      <Modal
+        visible={isImageModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsImageModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity 
+              style={styles.closeButton} 
+              onPress={() => setIsImageModalVisible(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+            {selectedImageUrl && (
+              <Image 
+                source={{ uri: selectedImageUrl }} 
+                style={styles.slipImage} 
+                resizeMode="contain" 
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -224,6 +266,51 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 16,
     textAlign: 'center',
+  },
+  viewSlipButton: {
+    marginTop: 12,
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  viewSlipText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    height: '80%',
+    backgroundColor: '#000',
+    borderRadius: 12,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    zIndex: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  slipImage: {
+    width: '100%',
+    height: '100%',
   },
 });
 

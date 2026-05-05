@@ -54,7 +54,10 @@ const createPayment = asyncHandler(async (req, res, next) => {
     paymentMethod = 'Cash',
     paymentDetails,
     transactionRef,
-    receiptImage,
+    receiptImage, // Might come as JSON if not uploaded
+    provider,
+    contactInfo,
+    cardHolderName,
   } = req.body;
   const appointmentRef = appointmentId || appointmentID;
 
@@ -100,15 +103,37 @@ const createPayment = asyncHandler(async (req, res, next) => {
 
   const paymentCode = await getNextPaymentCode();
 
+  // If paymentDetails came as parsed JSON, use it. Otherwise, build it from FormData fields
+  let finalPaymentDetails = paymentDetails;
+  if (!finalPaymentDetails) {
+    if (paymentMethod === 'Online') {
+      finalPaymentDetails = { provider, contactInfo };
+    } else if (paymentMethod === 'Card') {
+      finalPaymentDetails = { cardHolderName };
+    }
+  }
+
+  // Handle uploaded file via Multer
+  let finalReceiptImage = receiptImage;
+  if (req.file) {
+    finalReceiptImage = {
+      url: req.file.path,
+      publicId: req.file.filename,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+    };
+  }
+
   const payment = await Payment.create({
     paymentCode,
     appointment: appointment._id,
     patient: appointment.patient,
     amount,
     paymentMethod,
-    paymentDetails: normalizePaymentDetails(paymentMethod, paymentDetails),
+    paymentDetails: normalizePaymentDetails(paymentMethod, finalPaymentDetails),
     transactionRef,
-    receiptImage,
+    receiptImage: finalReceiptImage,
     status: 'Pending',
   });
 

@@ -9,10 +9,11 @@ import {
   removePayment,
 } from '../controllers/paymentController.js';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
+import upload from '../middleware/upload.js';
 
 const router = express.Router();
 
-router.post('/', protect, authorizeRoles('Patient', 'Admin'), createPayment);
+router.post('/', protect, authorizeRoles('Patient', 'Admin'), upload.single('slipImage'), createPayment);
 router.get('/patient/:userID', protect, authorizeRoles('Patient', 'Admin'), getPatientPayments);
 
 router.use(protect, authorizeRoles('Accountant', 'Admin'));
