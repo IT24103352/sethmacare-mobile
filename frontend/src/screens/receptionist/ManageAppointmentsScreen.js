@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react'; //manage appointments screen for receptionist
 import {
   Alert,
   FlatList,
